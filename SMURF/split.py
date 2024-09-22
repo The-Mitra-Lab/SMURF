@@ -1,31 +1,30 @@
 import copy
 import math
 
+import anndata
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import tqdm
-from numba import jit
+from numpy.linalg import norm
 from scipy.optimize import minimize
 from scipy.sparse import csr_matrix, lil_matrix
-
-from .spatial_object import spatial_object
 
 
 def objective3(v, A, B, C, D):
     x, y, z = v
-    return np.linalg.norm(A * x + B * y + C * z - D) ** 2
+    return norm(A * x + B * y + C * z - D) ** 2
 
 
 def objective2(v, A, B, C):
     x, y = v
-    return np.linalg.norm(A * x + B * y - C) ** 2
+    return norm(A * x + B * y - C) ** 2
 
 
 def find_connected_groups(lst):
-    from collections import defaultdict, deque
+    from collections import defaultdict
 
     graph = defaultdict(list)
     for sublst in lst:
@@ -68,6 +67,10 @@ def make_preparation(
     cells_final, so, adatas_final, adata, weight_to_celltype, maximum_cells=10000
 ):
 
+    weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
+        axis=1
+    ).reshape(-1, 1)
+
     x2 = np.array([0.5, 0.5])
     x3 = np.array([0.33, 0.33, 0.34])
 
@@ -92,8 +95,6 @@ def make_preparation(
     celltypes = list(adatas_final.obs.leiden.astype(int))
     for i in range(len(cell_ids)):
         cell_types[int(cell_ids[i])] = celltypes[i]
-
-    from scipy.sparse import csr_matrix, lil_matrix
 
     cells_before_ml = {}
     for cell_id in so.cells_main.keys():
@@ -122,8 +123,8 @@ def make_preparation(
                     ]
                 )
             if len(cell_types_all) == 2:
-                A = weight_to_celltype[list(cell_types_all)[0]]
-                B = weight_to_celltype[list(cell_types_all)[1]]
+                A = weight_to_celltype_norm[list(cell_types_all)[0]]
+                B = weight_to_celltype_norm[list(cell_types_all)[1]]
                 C = data_temp[spot_id] / data_temp[spot_id].sum()
                 x = minimize(
                     objective2,
@@ -164,9 +165,9 @@ def make_preparation(
                                 )
 
             elif len(cell_types_all) == 3:
-                A = weight_to_celltype[list(cell_types_all)[0]]
-                B = weight_to_celltype[list(cell_types_all)[1]]
-                C = weight_to_celltype[list(cell_types_all)[2]]
+                A = weight_to_celltype_norm[list(cell_types_all)[0]]
+                B = weight_to_celltype_norm[list(cell_types_all)[1]]
+                C = weight_to_celltype_norm[list(cell_types_all)[2]]
                 D = data_temp[spot_id] / data_temp[spot_id].sum()
                 x = minimize(
                     objective3,
@@ -218,8 +219,10 @@ def make_preparation(
                 )
             else:
                 # print(i)
-                A = i[1] * weight_to_celltype[i[3]]
-                B = (1 - i[1]) * weight_to_celltype[list(set(i[2]) - set([i[3]]))[0]]
+                A = i[1] * weight_to_celltype_norm[i[3]]
+                B = (1 - i[1]) * weight_to_celltype_norm[
+                    list(set(i[2]) - set([i[3]]))[0]
+                ]
                 X = np.nan_to_num(
                     np.rint(
                         (A / (A + B)).reshape(1, -1)
@@ -231,7 +234,6 @@ def make_preparation(
                 )
                 cells_before_ml_x[cell_id] = cells_before_ml_x[cell_id] + X
 
-    cells_toml = []
     spots_toml = []
 
     for i in range(len(to_ml)):
@@ -303,15 +305,11 @@ def make_preparation(
         pct_toml_dic[ct].append([to_ml[i][0], to_ml[i][2], to_ml[i][3], to_ml[i][4]])
 
     cells_toid_toml_dic = {}
-    spots_toid_toml_dic = {}
     id_tocells_toml_dic = {}
-    id_tospots_toml_dic = {}
 
     for i in groups_combined.keys():
         cells_toid_toml_dic[i] = {}
-        spots_toid_toml_dic[i] = {}
         id_tocells_toml_dic[i] = {}
-        id_tospots_toml_dic[i] = {}
 
     for i in groups_combined.keys():
         num = 0
@@ -319,14 +317,6 @@ def make_preparation(
             if int(cells_toml_dic[i][j]) not in cells_toid_toml_dic[i].keys():
                 cells_toid_toml_dic[i][int(cells_toml_dic[i][j])] = num
                 id_tocells_toml_dic[i][num] = int(cells_toml_dic[i][j])
-                num += 1
-
-    for i in groups_combined.keys():
-        num = 0
-        for j in range(len(spots_toml_dic[i])):
-            if int(spots_toml_dic[i][j]) not in spots_toid_toml_dic[i].keys():
-                spots_toid_toml_dic[i][int(spots_toml_dic[i][j])] = num
-                id_tospots_toml_dic[i][num] = int(spots_toml_dic[i][j])
                 num += 1
 
     nonzero_indices_toml = copy.deepcopy(nonzero_indices_dic)
@@ -339,9 +329,10 @@ def make_preparation(
                 ]
 
     cells_X_plus_dic = {}
-    spots_toml_dic = {}
     spots_X_dic = {}
     celltypes_dic = {}
+    spots_id_dic = {}
+    spots_id_dic_prop = {}
 
     for i in groups_combined.keys():
         cells_X_plus_dic[i] = np.zeros((len(cells_toid_toml_dic[i]), adata.shape[1]))
@@ -353,15 +344,21 @@ def make_preparation(
 
     for i in groups_combined.keys():
         spots_X_dic[i] = np.zeros((len(nonzero_indices_toml[i]), adata.shape[1]))
+        spots_id_dic[i] = np.zeros((len(nonzero_indices_toml[i]), 1))
+        spots_id_dic_prop[i] = np.zeros((len(nonzero_indices_toml[i]), 1))
+
         for j in range(len(nonzero_indices_toml[i])):
 
             spot_id = pct_toml_dic[i][j][0]
-            # spot_id2 = id_to_id2[spot_id]
+            spots_id_dic[i][j] = spot_id
 
             if pct_toml_dic[i][j][1] < 0.999999999:
 
-                A = pct_toml_dic[i][j][1] * weight_to_celltype[pct_toml_dic[i][j][3]]
-                B = (1 - pct_toml_dic[i][j][1]) * weight_to_celltype[
+                A = (
+                    pct_toml_dic[i][j][1]
+                    * weight_to_celltype_norm[pct_toml_dic[i][j][3]]
+                )
+                B = (1 - pct_toml_dic[i][j][1]) * weight_to_celltype_norm[
                     list(set(pct_toml_dic[i][j][2]) - set([pct_toml_dic[i][j][3]]))[0]
                 ]
                 X = np.nan_to_num(
@@ -375,8 +372,11 @@ def make_preparation(
                 )
                 spots_X_dic[i][j] = X
 
+                spots_id_dic_prop[i][j] = pct_toml_dic[i][j][1]
+
             else:
                 spots_X_dic[i][j] = data_temp[spot_id].toarray()
+                spots_id_dic_prop[i][j] = 1
 
     return (
         pct_toml_dic,
@@ -388,135 +388,9 @@ def make_preparation(
         cells_before_ml,
         cells_before_ml_x,
         groups_combined,
+        spots_id_dic,
+        spots_id_dic_prop,
     )
-
-
-def get_finaldata(
-    adata,
-    adatas_final,
-    so,
-    spot_cell_dic,
-    weight_to_celltype,
-    cells_before_ml,
-    cells_before_ml_x,
-    groups_combined,
-    pct_toml_dic,
-    spots_X_dic,
-    celltypes_dic,
-    cells_X_plus_dic,
-    nonzero_indices_dic,
-):
-
-    from scipy.sparse import csr_matrix
-
-    cell_types = {}
-    cell_ids = list(adatas_final.obs.index.astype(float))
-    celltypes = list(adatas_final.obs.leiden.astype(int))
-    for i in range(len(cell_ids)):
-        cell_types[int(cell_ids[i])] = celltypes[i]
-
-    data_temp = csr_matrix(adata.X)
-    np.random.seed(0)
-
-    num_temp = np.zeros([data_temp.shape[1]])
-    cells_after_ml = copy.deepcopy(cells_before_ml_x)
-
-    for i in tqdm.tqdm(groups_combined.keys()):
-        for j in range(len(pct_toml_dic[i])):
-            for k in range(len(nonzero_indices_dic[i][j])):
-                cell_id = nonzero_indices_dic[i][j][k]
-
-                num_temp = np.zeros([data_temp.shape[1]])
-                spot_data = spots_X_dic[i][j]
-                indices = np.where(spot_data > 0)[0]
-                num_temp[indices] = np.random.binomial(
-                    spot_data[indices].astype(int),
-                    spot_cell_dic[i][j][k],
-                    size=len(indices),
-                )
-
-                cells_after_ml[cell_id] = cells_after_ml[cell_id] + num_temp
-
-    cells_final_spot = copy.deepcopy(cells_before_ml)
-
-    for i in groups_combined.keys():
-        for j in range(len(pct_toml_dic[i])):
-            spot_id = pct_toml_dic[i][0][0]
-            for k in range(len(nonzero_indices_dic[i][j])):
-                cell_id = nonzero_indices_dic[i][j][k]
-
-                cells_final_spot[cell_id].append(
-                    [spot_id, pct_toml_dic[i][j][1] * spot_cell_dic[i][j][k]]
-                )
-
-    id_to_id2 = {}
-
-    for spot_xy in so.set_toindex_data.keys():
-        id_to_id2[so.set_toindex_data[spot_xy]] = so.set_toindex[spot_xy]
-
-    spots_final_cells = {}
-
-    for spot_id in np.unique(so.pixels):
-        spots_final_cells[spot_id] = []
-
-    for cell_id in cells_final_spot.keys():
-        for i in cells_final_spot[cell_id]:
-            spot_id = i[0]
-            pct = i[1]
-            spots_final_cells[id_to_id2[spot_id]].append([cell_id, pct])
-
-    from scipy.sparse import lil_matrix
-
-    probabilities_spots = {}
-    itmes_spots = {}
-
-    for spot_id in spots_final_cells.keys():
-
-        length = len(spots_final_cells[spot_id])
-        if length == 0:
-            probabilities_spots[spot_id] = [1]
-            itmes_spots[spot_id] = [0]
-        elif length == 1:
-            probabilities_spots[spot_id] = [1]
-            itmes_spots[spot_id] = [spots_final_cells[spot_id][0][0]]
-        else:
-            probabilities_spots[spot_id] = []
-            itmes_spots[spot_id] = []
-            for i in range(length):
-                probabilities_spots[spot_id].append(spots_final_cells[spot_id][i][1])
-                itmes_spots[spot_id].append(spots_final_cells[spot_id][i][0])
-
-    from numpy.linalg import norm
-
-    final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
-
-    cell_index = list(adatas_final.obs.index)
-    cell_info = np.zeros([len(adatas_final.obs), 2])
-
-    for i in tqdm.tqdm(range(len(cell_index))):
-
-        cell_id = float(cell_index[i])
-
-        final_X[i] = lil_matrix(cells_after_ml[cell_id])
-        cell_info[i, 0] = cell_types[cell_id]
-        if norm(cells_after_ml[cell_id]) != 0:
-            cell_info[i, 1] = np.dot(
-                cells_after_ml[cell_id], weight_to_celltype[int(cell_info[i, 0])]
-            ) / norm(cells_after_ml[cell_id])
-        else:
-            cell_info[i, 1] = 0
-
-    import anndata
-
-    adata_sc_final = anndata.AnnData(
-        X=final_X.tocsr(),
-        obs=pd.DataFrame(
-            cell_info, columns=["cell_type", "cos_simularity"], index=cell_index
-        ),
-        var=adata.var,
-    )
-
-    return adata_sc_final
 
 
 def calculate_distances(A, B, C):
@@ -529,6 +403,10 @@ def calculate_distances(A, B, C):
 
 
 def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype):
+
+    weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
+        axis=1
+    ).reshape(-1, 1)
 
     x2 = np.array([0.5, 0.5])
     x3 = np.array([0.33, 0.33, 0.34])
@@ -554,8 +432,6 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
     celltypes = list(adatas_final.obs.leiden.astype(int))
     for i in range(len(cell_ids)):
         cell_types[int(cell_ids[i])] = celltypes[i]
-
-    from scipy.sparse import csr_matrix, lil_matrix
 
     cells_before_ml = {}
     for cell_id in so.cells_main.keys():
@@ -584,8 +460,8 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
                     ]
                 )
             if len(cell_types_all) == 2:
-                A = weight_to_celltype[list(cell_types_all)[0]]
-                B = weight_to_celltype[list(cell_types_all)[1]]
+                A = weight_to_celltype_norm[list(cell_types_all)[0]]
+                B = weight_to_celltype_norm[list(cell_types_all)[1]]
                 C = data_temp[spot_id] / data_temp[spot_id].sum()
                 x = minimize(
                     objective2,
@@ -626,9 +502,9 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
                                 )
 
             elif len(cell_types_all) == 3:
-                A = weight_to_celltype[list(cell_types_all)[0]]
-                B = weight_to_celltype[list(cell_types_all)[1]]
-                C = weight_to_celltype[list(cell_types_all)[2]]
+                A = weight_to_celltype_norm[list(cell_types_all)[0]]
+                B = weight_to_celltype_norm[list(cell_types_all)[1]]
+                C = weight_to_celltype_norm[list(cell_types_all)[2]]
                 D = data_temp[spot_id] / data_temp[spot_id].sum()
                 x = minimize(
                     objective3,
@@ -690,8 +566,10 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
                 cells_x[cell_id] = cells_x[cell_id] + data_temp[i[0]]
             else:
                 # print(i)
-                A = i[1] * weight_to_celltype[i[3]]
-                B = (1 - i[1]) * weight_to_celltype[list(set(i[2]) - set([i[3]]))[0]]
+                A = i[1] * weight_to_celltype_norm[i[3]]
+                B = (1 - i[1]) * weight_to_celltype_norm[
+                    list(set(i[2]) - set([i[3]]))[0]
+                ]
                 X = np.nan_to_num(
                     np.rint(
                         (A / (A + B)).reshape(1, -1)
@@ -717,8 +595,6 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
             )
             cells_x[cell_id] = cells_x[cell_id] + csr_matrix(num_temp)
 
-    from numpy.linalg import norm
-
     final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
 
     cell_index = list(adatas_final.obs.index)
@@ -741,7 +617,184 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
         else:
             cell_info[i, 1] = 0
 
-    import anndata
+    adata_sc_final = anndata.AnnData(
+        X=final_X.tocsr(),
+        obs=pd.DataFrame(
+            cell_info, columns=["cell_type", "cos_simularity"], index=cell_index
+        ),
+        var=adata.var,
+    )
+
+    return adata_sc_final
+
+
+def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
+
+    cell_ids = list(adatas_final.obs.index.astype(float))
+
+    data_temp = csr_matrix(adata.X)
+
+    final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
+    for i in tqdm.tqdm(range(len(adatas_final.obs))):
+        set_cell_index = [
+            so.set_toindex_data[key]
+            for key in cells_final[cell_ids[int(i)]]
+            if key in so.set_toindex_data
+        ]
+        final_X[int(i)] = lil_matrix(
+            data_temp[set_cell_index, :].sum(axis=0).reshape(1, -1)
+        )
+
+    weight_to_celltype = np.zeros(
+        (len(adatas_final.obs.leiden.unique()), adata.shape[1])
+    )
+    for i in range(len(adatas_final.obs.leiden.unique())):
+        weight_to_celltype[i] = final_X[adatas_final.obs.leiden == str(i)].mean(axis=0)
+
+    weight_to_celltype = weight_to_celltype / norm(weight_to_celltype, axis=1).reshape(
+        -1, 1
+    )
+
+    return weight_to_celltype
+
+
+def get_finaldata(
+    adata,
+    adatas_final,
+    spot_cell_dic,
+    weight_to_celltype,
+    cells_before_ml,
+    groups_combined,
+    pct_toml_dic,
+    nonzero_indices_dic,
+    spots_X_dic=None,
+    nonzero_indices_toml=None,
+    cells_before_ml_x=None,
+):
+
+    data_temp = csr_matrix(adata.X)
+
+    if cells_before_ml_x == None:
+        cells_before_ml_x = {}
+        for cell_id in cells_before_ml.keys():
+            cells_before_ml_x[cell_id] = np.zeros([data_temp.shape[1]])
+
+        for cell_id in cells_before_ml.keys():
+            for i in cells_before_ml[cell_id]:
+                if i[1] > 0.9999999:
+                    cells_before_ml_x[cell_id] = (
+                        cells_before_ml_x[cell_id] + data_temp[i[0]]
+                    )
+                else:
+                    # print(i)
+                    A = i[1] * weight_to_celltype[i[3]]
+                    B = (1 - i[1]) * weight_to_celltype[
+                        list(set(i[2]) - set([i[3]]))[0]
+                    ]
+                    X = np.nan_to_num(
+                        np.rint(
+                            (A / (A + B)).reshape(1, -1)
+                            * np.array(data_temp[i[0]].todense())
+                        ),
+                        nan=0.0,
+                        posinf=0.0,
+                        neginf=0.0,
+                    )
+                    cells_before_ml_x[cell_id] = cells_before_ml_x[cell_id] + X
+
+    if spots_X_dic == None:
+
+        if nonzero_indices_toml != None:
+
+            spots_X_dic = {}
+
+            for i in groups_combined.keys():
+                spots_X_dic[i] = np.zeros(
+                    (len(nonzero_indices_toml[i]), adata.shape[1])
+                )
+
+                for j in range(len(nonzero_indices_toml[i])):
+
+                    spot_id = pct_toml_dic[i][j][0]
+
+                    if pct_toml_dic[i][j][1] < 0.999999999:
+
+                        A = (
+                            pct_toml_dic[i][j][1]
+                            * weight_to_celltype[pct_toml_dic[i][j][3]]
+                        )
+                        B = (1 - pct_toml_dic[i][j][1]) * weight_to_celltype[
+                            list(
+                                set(pct_toml_dic[i][j][2])
+                                - set([pct_toml_dic[i][j][3]])
+                            )[0]
+                        ]
+                        X = np.nan_to_num(
+                            np.rint(
+                                (A / (A + B)).reshape(1, -1)
+                                * np.array(data_temp[spot_id].todense())
+                            ),
+                            nan=0.0,
+                            posinf=0.0,
+                            neginf=0.0,
+                        )
+                        spots_X_dic[i][j] = X
+
+                    else:
+                        spots_X_dic[i][j] = data_temp[spot_id].toarray()
+
+        else:
+
+            raise Exception(
+                "Please input either spots_X_dic or nonzero_indices_toml. We will use spots_X_dic in default."
+            )
+
+    cell_types = {}
+    cell_ids = list(adatas_final.obs.index.astype(float))
+    celltypes = list(adatas_final.obs.leiden.astype(int))
+    for i in range(len(cell_ids)):
+        cell_types[int(cell_ids[i])] = celltypes[i]
+
+    np.random.seed(0)
+
+    num_temp = np.zeros([data_temp.shape[1]])
+    cells_after_ml = copy.deepcopy(cells_before_ml_x)
+
+    for i in tqdm.tqdm(groups_combined.keys()):
+        for j in range(len(pct_toml_dic[i])):
+            for k in range(len(nonzero_indices_dic[i][j])):
+                cell_id = nonzero_indices_dic[i][j][k]
+
+                num_temp = np.zeros([data_temp.shape[1]])
+                spot_data = spots_X_dic[i][j]
+                indices = np.where(spot_data > 0)[0]
+                num_temp[indices] = np.random.binomial(
+                    spot_data[indices].astype(int),
+                    spot_cell_dic[i][j][k],
+                    size=len(indices),
+                )
+
+                cells_after_ml[cell_id] = cells_after_ml[cell_id] + num_temp
+
+    from scipy.sparse import lil_matrix
+
+    final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
+
+    cell_index = list(adatas_final.obs.index)
+    cell_info = np.zeros([len(adatas_final.obs), 2])
+
+    for i in tqdm.tqdm(range(len(cell_index))):
+
+        cell_id = float(cell_index[i])
+
+        final_X[i] = lil_matrix(cells_after_ml[cell_id])
+        cell_info[i, 0] = cell_types[cell_id]
+        if norm(cells_after_ml[cell_id]) != 0:
+            cell_info[i, 1] = np.dot(
+                cells_after_ml[cell_id], weight_to_celltype[int(cell_info[i, 0])]
+            ) / norm(cells_after_ml[cell_id])
+        else:
+            cell_info[i, 1] = 0
 
     adata_sc_final = anndata.AnnData(
         X=final_X.tocsr(),

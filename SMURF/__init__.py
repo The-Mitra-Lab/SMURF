@@ -1,8 +1,9 @@
-"""SMURF"""
+"""Segmentation and Manifold UnRolling Framework"""
 
 from .__helper__ import (
     expanding_cells,
     fill_pixels,
+    find_plot,
     itering_arragement,
     make_pixels_cells,
     nuclei_rna,
@@ -24,4 +25,4 @@ from .split import (
     make_preparation,
 )
 
-__version__ = "0.0.1"
+__version__ = "0.0.3"

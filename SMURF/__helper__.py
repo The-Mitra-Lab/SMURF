@@ -309,7 +309,7 @@ def singlecellanalysis(
         else:
             sc.pl.umap(adata, color=["leiden"], save=save)
 
-        return adata
+    return adata
 
 
 def expanding_cells(
@@ -464,7 +464,7 @@ def expanding_cells(
         final_data[i_num] = copy.deepcopy(cell_matrix)
 
     if cortex:
-        for i_num in tqdm.tqdm(range(total_num)):
+        for i_num in range(total_num):
 
             cell_id = cell_ids[i_num]
             cell_type = celltypes[i_num]
@@ -864,9 +864,36 @@ def itering_arragement(
         with open(save_folder + "cells_final_" + str(i) + ".pkl", "wb") as f:
             pickle.dump(cells_final, f)
 
-        print(mi, i)
+        if show:
+            print(mi, i)
         if (i > max_mi_i + 1) and max_mi > mi:
+
+            with open(save_folder + "weights_record.pkl", "wb") as f:
+                pickle.dump(weights_record[max_mi_i], f)
+
+            import os
+
+            for j in range(1, i + 1):
+                if j != max_mi_i:
+                    os.remove(save_folder + "adatas_ini_" + str(j) + ".h5ad")
+                    os.remove(save_folder + "adatas_" + str(j) + ".h5ad")
+                    os.remove(save_folder + "cells_final_" + str(j) + ".pkl")
+
+            os.rename(
+                save_folder + "adatas_ini_" + str(max_mi_i) + ".h5ad",
+                save_folder + "adatas_ini.h5ad",
+            )
+            os.rename(
+                save_folder + "adatas_" + str(max_mi_i) + ".h5ad",
+                save_folder + "adatas.h5ad",
+            )
+            os.rename(
+                save_folder + "cells_final_" + str(max_mi_i) + ".pkl",
+                save_folder + "cells_final.pkl",
+            )
+
             break
+
         else:
 
             if max_mi < mi:
@@ -881,5 +908,129 @@ def itering_arragement(
             weights = weights / norm(weights, axis=1).reshape(-1, 1)
             weights_record[i] = weights
 
-            with open(save_folder + "weights_record.pkl", "wb") as f:
-                pickle.dump(weights_record, f)
+
+def make_pixels_cells(
+    so,
+    adata,
+    cells_before_ml,
+    spot_cell_dic,
+    spots_id_dic,
+    spots_id_dic_prop,
+    nonzero_indices_dic,
+    seed=42,
+):
+
+    np.random.seed(seed)
+    spots_composition = {}
+    for i in so.index_toset.keys():
+        spots_composition[i] = {}
+
+    for i in cells_before_ml.keys():
+        for j in cells_before_ml[i]:
+            spots_composition[j[0]][i] = j[1]
+
+    for i in spot_cell_dic.keys():
+        for j in range(len(spot_cell_dic[i])):
+            for k in range(len(spot_cell_dic[i][j])):
+                spots_composition[spots_id_dic[i][j][0]][
+                    nonzero_indices_dic[i][j][k]
+                ] = (spot_cell_dic[i][j][k] * spots_id_dic_prop[i][j][0])
+
+    keys = list(spots_composition.keys())
+    for i in keys:
+        if len(spots_composition[i]) == 0:
+            del spots_composition[i]
+        elif abs(sum(spots_composition[i].values()) - 1) > 0.0001:
+            raise ValueError("Proportion Sum for spot" + str(i) + " is not 1.")
+        else:
+            for k in spots_composition[i].keys():
+                spots_composition[i][k] = spots_composition[i][k] / sum(
+                    spots_composition[i].values()
+                )
+
+    keys = list(spots_composition.keys())
+    for i in keys:
+        for k in spots_composition[i].keys():
+            spots_composition[i][k] = spots_composition[i][k] / sum(
+                spots_composition[i].values()
+            )
+
+    df1 = copy.deepcopy(adata.obs)
+    df1["barcode"] = df1.index
+
+    df2 = copy.deepcopy(so.df)
+    df2["index"] = df2.index
+
+    df = pd.merge(df1, df2, on=["barcode"], how="inner")
+    df_index = np.array(df["index"])
+
+    spots_dict_new = {}
+
+    for i in spots_composition.keys():
+        spots_dict_new[df_index[i]] = spots_composition[i]
+
+    original_matrix = so.pixels
+    new_matrix = np.zeros_like(original_matrix, dtype=int)
+
+    for i in tqdm.tqdm(range(original_matrix.shape[0])):
+        for j in range(original_matrix.shape[1]):
+            spot_id = original_matrix[i, j]
+            if spot_id != -1 and spot_id in spots_dict_new:
+                cell_dict = spots_dict_new[spot_id]
+                if cell_dict:
+                    cells = list(cell_dict.keys())
+                    chosen_cell_id = np.random.choice(cells, p=list(cell_dict.values()))
+                    new_matrix[i, j] = chosen_cell_id
+
+    so.pixels_cells = new_matrix
+
+    return so
+
+
+def plot_pixels_cells(
+    image,
+    cells,
+    colors=None,
+    dpi=1500,
+    transparency=0.6,
+    save="combined_image_bin2cell.pdf",
+):
+
+    import matplotlib.colors as mcolors
+
+    matrix = copy.deepcopy(cells)
+    matrix_mod_1 = copy.deepcopy(matrix)
+    matrix_mod_2 = copy.deepcopy(matrix)
+    matrix_mod_3 = copy.deepcopy(matrix)
+
+    nums = [9, 5, 7]
+    matrix_mod_1[matrix_mod_1 > 0] = (
+        240 / nums[0] * (matrix_mod_1[matrix_mod_1 > 0] % nums[0])
+    ) + 1
+    matrix_mod_2[matrix_mod_2 > 0] = (
+        240 / nums[1] * (matrix_mod_2[matrix_mod_2 > 0] % nums[1])
+    ) + 1
+    matrix_mod_3[matrix_mod_3 > 0] = (
+        240 / nums[2] * (matrix_mod_3[matrix_mod_3 > 0] % nums[2])
+    ) + 1
+
+    rgb_matrix = np.stack((matrix_mod_1, matrix_mod_2, matrix_mod_3), axis=-1)
+
+    rgb_matrix = (rgb_matrix).astype(np.uint8)
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.imshow(image)
+    ax.imshow(255 - rgb_matrix, interpolation="nearest", alpha=transparency)
+
+    plt.axis("off")
+
+    if save != False:
+        plt.savefig(save, dpi=dpi, bbox_inches="tight", pad_inches=0)
+    plt.show()
+
+
+def find_plot(so, image_format="he"):
+    if image_format == "he":
+        return so.image[so.row_left : so.row_right, so.col_up : so.col_down, :]
+    elif image_format == "dapi":
+        return so.image[so.row_left : so.row_right, so.col_up : so.col_down]
