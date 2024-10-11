@@ -672,12 +672,15 @@ def get_finaldata(
     cells_before_ml_x=None,
 ):
 
+    binnumbers = {}
+
     data_temp = csr_matrix(adata.X)
 
     if cells_before_ml_x == None:
         cells_before_ml_x = {}
         for cell_id in cells_before_ml.keys():
             cells_before_ml_x[cell_id] = np.zeros([data_temp.shape[1]])
+            binnumbers[cell_id] = 0
 
         for cell_id in cells_before_ml.keys():
             for i in cells_before_ml[cell_id]:
@@ -685,6 +688,7 @@ def get_finaldata(
                     cells_before_ml_x[cell_id] = (
                         cells_before_ml_x[cell_id] + data_temp[i[0]]
                     )
+                    binnumbers[cell_id] = binnumbers[cell_id] + 1
                 else:
                     # print(i)
                     A = i[1] * weight_to_celltype[i[3]]
@@ -701,6 +705,19 @@ def get_finaldata(
                         neginf=0.0,
                     )
                     cells_before_ml_x[cell_id] = cells_before_ml_x[cell_id] + X
+                    binnumbers[cell_id] = binnumbers[cell_id] + i[1]
+
+    else:
+        for cell_id in cells_before_ml.keys():
+            binnumbers[cell_id] = 0
+
+        for cell_id in cells_before_ml.keys():
+            for i in cells_before_ml[cell_id]:
+                if i[1] > 0.9999999:
+                    binnumbers[cell_id] = binnumbers[cell_id] + 1
+                else:
+                    # print(i)
+                    binnumbers[cell_id] = binnumbers[cell_id] + i[1]
 
     if spots_X_dic == None:
 
@@ -758,7 +775,17 @@ def get_finaldata(
     np.random.seed(0)
 
     num_temp = np.zeros([data_temp.shape[1]])
-    cells_after_ml = copy.deepcopy(cells_before_ml_x)
+    # cells_after_ml = copy.deepcopy(cells_before_ml_x)
+
+    cellid_to_index = {}
+
+    final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
+    cell_index = list(adatas_final.obs.index)
+
+    for i in tqdm.tqdm(range(len(cell_index))):
+        cell_id = float(cell_index[i])
+        cellid_to_index[cell_id] = i
+        final_X[i] = csr_matrix(cells_before_ml_x[cell_id])
 
     for i in tqdm.tqdm(groups_combined.keys()):
         for j in range(len(pct_toml_dic[i])):
@@ -773,35 +800,47 @@ def get_finaldata(
                     spot_cell_dic[i][j][k],
                     size=len(indices),
                 )
+                col_indices = np.nonzero(num_temp)[0]
+                values = num_temp[col_indices]
 
-                cells_after_ml[cell_id] = cells_after_ml[cell_id] + num_temp
+                #  final_X.rows[cellid_to_index[cell_id]].extend(col_indices.tolist())
+                #  final_X.data[cellid_to_index[cell_id]].extend(values.tolist())
+                final_X[cellid_to_index[cell_id], col_indices] = values
 
-    from scipy.sparse import lil_matrix
+                binnumbers[cell_id] = (
+                    binnumbers[cell_id] + spot_cell_dic[i][j][k] * pct_toml_dic[i][j][1]
+                )
 
-    final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
+    cell_info = np.zeros([len(adatas_final.obs), 3])
 
-    cell_index = list(adatas_final.obs.index)
-    cell_info = np.zeros([len(adatas_final.obs), 2])
+    #  final_X = lil_matrix(final_X)
 
     for i in tqdm.tqdm(range(len(cell_index))):
 
         cell_id = float(cell_index[i])
 
-        final_X[i] = lil_matrix(cells_after_ml[cell_id])
         cell_info[i, 0] = cell_types[cell_id]
-        if norm(cells_after_ml[cell_id]) != 0:
-            cell_info[i, 1] = np.dot(
-                cells_after_ml[cell_id], weight_to_celltype[int(cell_info[i, 0])]
-            ) / norm(cells_after_ml[cell_id])
+        cell_info[i, 2] = binnumbers[cell_id]
+        if final_X[i].sum() > 0:
+
+            a = np.dot(
+                final_X[i].tocsr().toarray(), weight_to_celltype[cell_types[cell_id]]
+            ) / norm(final_X[i].tocsr().toarray())
+            cell_info[i, 1] = a[0]
+            # np.dot(final_X[i].todense() , weight_to_celltype[ int(cell_info[i,0])]) / norm(final_X[i].todense())
         else:
             cell_info[i, 1] = 0
 
     adata_sc_final = anndata.AnnData(
         X=final_X.tocsr(),
         obs=pd.DataFrame(
-            cell_info, columns=["cell_type", "cos_simularity"], index=cell_index
+            cell_info,
+            columns=["cell_type", "cos_simularity", "cell_size"],
+            index=cell_index,
         ),
         var=adata.var,
     )
+
+    # adata_sc_final.X.eliminate_zeros()
 
     return adata_sc_final

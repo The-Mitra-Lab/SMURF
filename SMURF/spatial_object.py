@@ -44,7 +44,7 @@ def spots(segmentation_final, pixels, df):
     return to_dict(spots)
 
 
-def create_cells_main(cells, spots, cells_main_pct, max_pixel):
+def create_cells_main(cells, spots, cells_main_pct, max_spot):
 
     cells_main = {}
     for cell in list(cells.keys()):
@@ -54,7 +54,7 @@ def create_cells_main(cells, spots, cells_main_pct, max_pixel):
                 if cells[cell][spot] > cells_main_pct * sum(spots[spot].values()):
                     cells_main[cell].append(spot)
 
-        if cells_main[cell] == [] or len(cells_main[cell]) > max_pixel:
+        if cells_main[cell] == [] or len(cells_main[cell]) > max_spot:
             del cells_main[cell]
 
     return cells_main
@@ -269,9 +269,7 @@ class spatial_object:
             segmentation_results, i_max, j_max, loop, gap
         )
 
-    def generate_cell_spots_information(
-        self, max_pixel=50, cells_main_pct=float(1 / 6)
-    ):
+    def generate_cell_spots_information(self, max_spot=50, cells_main_pct=float(1 / 6)):
 
         print("Generating cells information.")
         self.cells = cells(self.segmentation_final, self.pixels)
@@ -289,7 +287,7 @@ class spatial_object:
         print("Filtering cells")
 
         self.cells_main = create_cells_main(
-            self.cells, self.spots, cells_main_pct, max_pixel
+            self.cells, self.spots, cells_main_pct, max_spot
         )
 
         print("Creating NN network")

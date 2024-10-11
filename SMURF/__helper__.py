@@ -1,4 +1,5 @@
 import copy
+import os
 import pickle
 
 import anndata
@@ -788,10 +789,11 @@ def itering_arragement(
     resolution=1,
     save_folder="results_example/",
     show=True,
+    keep_previous=False,
 ):
 
     new_length = np.zeros((so.indices.shape[0], 2))
-    for i in so.indices[:, 0]:
+    for i in range(so.indices.shape[0]):
         cell_id = so.cell_ids[i]
         new_length[i, 0] = cell_id
         new_length[i, 1] = so.length_main[cell_id]
@@ -814,14 +816,14 @@ def itering_arragement(
     mis = [0]
 
     new_length = np.zeros((so.indices.shape[0], 2))
-    for i in so.indices[:, 0]:
+    for i in range(so.indices.shape[0]):
         cell_id = so.cell_ids[i]
         new_length[i, 0] = cell_id
         new_length[i, 1] = so.length_main[cell_id]
 
     re = so.distances[:, 1:4].mean(axis=1) - 2 * np.sqrt(new_length[:, 1] / np.pi)
     iter_cells = {}
-    for i in so.indices[:, 0]:
+    for i in range(so.indices.shape[0]):
         cell_id = so.cell_ids[i]
         iter_cells[cell_id] = re[i]
         if re[i] < 0:
@@ -871,14 +873,6 @@ def itering_arragement(
             with open(save_folder + "weights_record.pkl", "wb") as f:
                 pickle.dump(weights_record[max_mi_i], f)
 
-            import os
-
-            for j in range(1, i + 1):
-                if j != max_mi_i:
-                    os.remove(save_folder + "adatas_ini_" + str(j) + ".h5ad")
-                    os.remove(save_folder + "adatas_" + str(j) + ".h5ad")
-                    os.remove(save_folder + "cells_final_" + str(j) + ".pkl")
-
             os.rename(
                 save_folder + "adatas_ini_" + str(max_mi_i) + ".h5ad",
                 save_folder + "adatas_ini.h5ad",
@@ -892,12 +886,35 @@ def itering_arragement(
                 save_folder + "cells_final.pkl",
             )
 
+            if keep_previous != True:
+                for j in range(max_mi_i + 1, i + 1):
+                    try:
+                        os.remove(save_folder + "adatas_ini_" + str(j) + ".h5ad")
+                        os.remove(save_folder + "adatas_" + str(j) + ".h5ad")
+                        os.remove(save_folder + "cells_final_" + str(j) + ".pkl")
+                    except:
+                        1
+
             break
 
         else:
 
             if max_mi < mi:
                 max_mi = mi
+
+                if keep_previous != True:
+                    for j in range(max_mi_i, i):
+                        try:
+                            os.remove(
+                                save_folder + "adatas_ini_" + str(max_mi_i) + ".h5ad"
+                            )
+                            os.remove(save_folder + "adatas_" + str(max_mi_i) + ".h5ad")
+                            os.remove(
+                                save_folder + "cells_final_" + str(max_mi_i) + ".pkl"
+                            )
+                        except:
+                            1
+
                 max_mi_i = i
 
             weights = np.zeros((len(np.unique(adata_type_record[i])), adata.shape[1]))
