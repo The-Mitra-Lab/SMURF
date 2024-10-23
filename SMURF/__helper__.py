@@ -1,6 +1,7 @@
 import copy
 import os
 import pickle
+import warnings
 
 import anndata
 import matplotlib.patches as patches
@@ -12,7 +13,7 @@ import tqdm
 from numba import jit
 from numpy.linalg import norm
 from PIL import Image
-from scipy.sparse import csr_matrix, lil_matrix
+from scipy.sparse import SparseEfficiencyWarning, csr_matrix, lil_matrix
 from sklearn.metrics import normalized_mutual_info_score
 
 from .spatial_object import spatial_object
@@ -254,14 +255,31 @@ def nuclei_rna(adata, so, min_percent=0.4):
     so.set_excludes = copy.deepcopy(set_excludes)
     so.length_main = copy.deepcopy(length_main)
     so.cell_matrix = copy.deepcopy(cell_matrix)
-    so.final_nuclei = copy.deepcopy(csr_matrix(final_data))
+
+    cell_ids_str = [str(cell_id) for cell_id in cell_ids]
+
+    so.final_nuclei = anndata.AnnData(
+        X=copy.deepcopy(csr_matrix(final_data)),
+        obs=pd.DataFrame([], index=cell_ids_str),
+        var=adata.var,
+    )
 
     return so
 
 
 def singlecellanalysis(
-    adata, save=False, i=None, path=None, resolution=1, random_state=0, show=True
+    adata,
+    save=False,
+    i=None,
+    path=None,
+    resolution=1,
+    regress_out=True,
+    random_state=0,
+    show=True,
 ):
+
+    warnings.simplefilter("ignore", SparseEfficiencyWarning)
+    warnings.filterwarnings("ignore", message="IOStream.flush timed out")
 
     if show:
         print("Starting mt")
@@ -276,8 +294,9 @@ def singlecellanalysis(
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
     sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
-    adata = adata[:, adata.var.highly_variable]
-    sc.pp.regress_out(adata, ["total_counts", "pct_counts_mt"])
+    adata = adata[:, adata.var.highly_variable].copy()
+    if regress_out:
+        sc.pp.regress_out(adata, ["total_counts", "pct_counts_mt"])
     sc.pp.scale(adata, max_value=10)
 
     if show:
@@ -300,6 +319,8 @@ def singlecellanalysis(
         adata,
         resolution=resolution,
         random_state=random_state,
+        flavor="igraph",
+        n_iterations=2,
     )
 
     if show:
@@ -787,6 +808,7 @@ def itering_arragement(
     adata,
     so,
     resolution=1,
+    regress_out=True,
     save_folder="results_example/",
     show=True,
     keep_previous=False,
@@ -852,7 +874,13 @@ def itering_arragement(
         )
         adata_temp.write(save_folder + "adatas_ini_" + str(i) + ".h5ad")
         adata_temp = singlecellanalysis(
-            adata_temp, True, i, save_folder, resolution=resolution, show=show
+            adata_temp,
+            True,
+            i,
+            save_folder,
+            regress_out=regress_out,
+            resolution=resolution,
+            show=show,
         )
         adata_type_record[i] = list(adata_temp.obs["leiden"])
         mi = normalized_mutual_info_score(

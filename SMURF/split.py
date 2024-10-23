@@ -461,13 +461,9 @@ def make_preparation(
     )
 
 
-def calculate_distances(A, B, C):
-    # Calculate distance between A and B
-    AB = math.sqrt((B[0] - A[0]) ** 2 + (B[1] - A[1]) ** 2)
-    # Calculate distance between A and C
+def calculate_distances(A, C):
     AC = math.sqrt((C[0] - A[0]) ** 2 + (C[1] - A[1]) ** 2)
-    sums = AB + AC
-    return AB / sums, AC / sums
+    return 1 / (AC + 1e-8)
 
 
 def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
@@ -512,6 +508,7 @@ def get_finaldata(
     spots_X_dic=None,
     nonzero_indices_toml=None,
     cells_before_ml_x=None,
+    so=None,
 ):
 
     binnumbers = {}
@@ -653,31 +650,65 @@ def get_finaldata(
                     binnumbers[cell_id] + spot_cell_dic[i][j][k] * pct_toml_dic[i][j][1]
                 )
 
-    cell_info = np.zeros([len(adatas_final.obs), 3])
+    if so == None:
+        cell_info = np.zeros([len(adatas_final.obs), 3])
 
-    for i in range(len(cell_index)):
+        for i in range(len(cell_index)):
 
-        cell_id = float(cell_index[i])
+            cell_id = float(cell_index[i])
 
-        cell_info[i, 0] = cell_types[cell_id]
-        cell_info[i, 2] = binnumbers[cell_id]
-        if final_X[i].sum() > 0:
-            a = np.dot(
-                final_X[i].tocsr().toarray(), weight_to_celltype[cell_types[cell_id]]
-            ) / norm(final_X[i].tocsr().toarray())
-            cell_info[i, 1] = a[0]
-        else:
-            cell_info[i, 1] = 0
+            cell_info[i, 0] = cell_types[cell_id]
+            cell_info[i, 2] = binnumbers[cell_id]
+            if final_X[i].sum() > 0:
+                a = np.dot(
+                    final_X[i].tocsr().toarray(),
+                    weight_to_celltype[cell_types[cell_id]],
+                ) / norm(final_X[i].tocsr().toarray())
+                cell_info[i, 1] = a[0]
+            else:
+                cell_info[i, 1] = 0
 
-    adata_sc_final = anndata.AnnData(
-        X=final_X.tocsr(),
-        obs=pd.DataFrame(
-            cell_info,
-            columns=["cell_type", "cos_simularity", "cell_size"],
-            index=cell_index,
-        ),
-        var=adata.var,
-    )
+        adata_sc_final = anndata.AnnData(
+            X=final_X.tocsr(),
+            obs=pd.DataFrame(
+                cell_info,
+                columns=["cell_type", "cos_simularity", "cell_size"],
+                index=cell_index,
+            ),
+            var=adata.var,
+        )
+
+    else:
+
+        cell_info = np.zeros([len(adatas_final.obs), 5])
+
+        for i in range(len(cell_index)):
+
+            cell_id = float(cell_index[i])
+
+            cell_info[i, 0] = cell_types[cell_id]
+            cell_info[i, 2] = binnumbers[cell_id]
+            cell_info[i, 3] = so.cell_centers[cell_id][0]
+            cell_info[i, 4] = so.cell_centers[cell_id][1]
+
+            if final_X[i].sum() > 0:
+                a = np.dot(
+                    final_X[i].tocsr().toarray(),
+                    weight_to_celltype[cell_types[cell_id]],
+                ) / norm(final_X[i].tocsr().toarray())
+                cell_info[i, 1] = a[0]
+            else:
+                cell_info[i, 1] = 0
+
+        adata_sc_final = anndata.AnnData(
+            X=final_X.tocsr(),
+            obs=pd.DataFrame(
+                cell_info,
+                columns=["cell_type", "cos_simularity", "cell_size", "x", "y"],
+                index=cell_index,
+            ),
+            var=adata.var,
+        )
 
     # adata_sc_final.X.eliminate_zeros()
 
@@ -689,6 +720,10 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
     weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
         axis=1
     ).reshape(-1, 1)
+
+    spots_composition = {}
+    for i in so.index_toset.keys():
+        spots_composition[i] = {}
 
     x2 = np.array([0.5, 0.5])
     x3 = np.array([0.33, 0.33, 0.34])
@@ -891,17 +926,26 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
                                     ]
                                 )
 
+    for i in cells_before_ml.keys():
+        for j in cells_before_ml[i]:
+            spots_composition[j[0]][i] = j[1]
+
     rows = list(so.df[so.df.in_tissue == 1].array_row)
     cols = list(so.df[so.df.in_tissue == 1].array_col)
 
     ratios = []
     for i in range(len(to_ml)):
-        AB, AC = calculate_distances(
-            (rows[to_ml[i][0]], cols[to_ml[i][0]]),
-            so.cell_centers[to_ml[i][1][0]],
-            so.cell_centers[to_ml[i][1][1]],
-        )
-        ratios.append([AB, AC])
+        new = []
+        for j in range(len(to_ml[i][1])):
+            new.append(
+                calculate_distances(
+                    (rows[to_ml[i][0]], cols[to_ml[i][0]]),
+                    so.cell_centers[to_ml[i][1][j]],
+                )
+            )
+        new = np.array(new)
+        new = new / new.sum()
+        ratios.append(new)
 
     cells_x = {}
     for cell_id in cells_before_ml.keys():
@@ -937,22 +981,46 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
     np.random.seed(0)
     for i in range(len(to_ml)):
 
-        for cell_id in to_ml[i][1]:
-
-            num_temp = np.zeros([data_temp.shape[1]])
+        if to_ml[i][2] > 0.9999999:
             spot_data = data_temp[to_ml[i][0]]
             spot_data = np.array(spot_data.todense())[0]
+
+        else:
+            #   print(spot_data.shape)
+            A = to_ml[i][2] * weight_to_celltype_norm[to_ml[i][4]]
+            B = (1 - to_ml[i][2]) * weight_to_celltype_norm[
+                list(set(to_ml[i][3]) - set([to_ml[i][4]]))[0]
+            ]
+            denominator = A + B
+            denominator[denominator == 0] = epsilon
+            spot_data = np.nan_to_num(
+                np.rint(
+                    (A / denominator).reshape(1, -1)
+                    * np.array(data_temp[to_ml[i][0]].todense())
+                ),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )[0]
+        #  spot_data = np.array(spot_data.todense())[0]
+        #  print(spot_data.shape)
+
+        for j in range(len(to_ml[i][1])):
+
+            cell_id = to_ml[i][1][j]
+            num_temp = np.zeros([data_temp.shape[1]])
             indices = np.where(spot_data > 0)[0]
             num_temp[indices] = np.random.binomial(
-                spot_data[indices].astype(int), ratios[i][0], size=len(indices)
+                spot_data[indices].astype(int), ratios[i][j], size=len(indices)
             )
             cells_x[cell_id] = cells_x[cell_id] + csr_matrix(num_temp)
-            binnumbers[cell_id] = binnumbers[cell_id] + ratios[i][0]
+            binnumbers[cell_id] = binnumbers[cell_id] + ratios[i][j] * to_ml[i][2]
+            spots_composition[to_ml[i][0]][cell_id] = ratios[i][j] * to_ml[i][2]
 
     final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
 
     cell_index = list(adatas_final.obs.index)
-    cell_info = np.zeros([len(adatas_final.obs), 3])
+    cell_info = np.zeros([len(adatas_final.obs), 5])
 
     cell_types = {}
     cell_ids = list(adatas_final.obs.index.astype(float))
@@ -965,6 +1033,9 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
         final_X[i] = lil_matrix(cells_x[cell_id])
         cell_info[i, 0] = cell_types[cell_id]
         cell_info[i, 2] = binnumbers[cell_id]
+        cell_info[i, 3] = so.cell_centers[cell_id][0]
+        cell_info[i, 4] = so.cell_centers[cell_id][1]
+
         if norm(cells_x[cell_id]) != 0:
             cell_info[i, 1] = (
                 np.dot(
@@ -978,10 +1049,58 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
         X=final_X.tocsr(),
         obs=pd.DataFrame(
             cell_info,
-            columns=["cell_type", "cos_simularity", "cell_size"],
+            columns=["cell_type", "cos_simularity", "cell_size", "x", "y"],
             index=cell_index,
         ),
         var=adata.var,
     )
+
+    keys = list(spots_composition.keys())
+    for i in keys:
+        if len(spots_composition[i]) == 0:
+            del spots_composition[i]
+        elif abs(sum(spots_composition[i].values()) - 1) > 0.0001:
+            raise ValueError("Proportion Sum for spot " + str(i) + " is not 1.")
+        else:
+            for k in spots_composition[i].keys():
+                spots_composition[i][k] = spots_composition[i][k] / sum(
+                    spots_composition[i].values()
+                )
+
+    keys = list(spots_composition.keys())
+    for i in keys:
+        for k in spots_composition[i].keys():
+            spots_composition[i][k] = spots_composition[i][k] / sum(
+                spots_composition[i].values()
+            )
+
+    df1 = copy.deepcopy(adata.obs)
+    df1["barcode"] = df1.index
+
+    df2 = copy.deepcopy(so.df)
+    df2["index"] = df2.index
+
+    df = pd.merge(df1, df2, on=["barcode"], how="inner")
+    df_index = np.array(df["index"])
+
+    spots_dict_new = {}
+
+    for i in spots_composition.keys():
+        spots_dict_new[df_index[i]] = spots_composition[i]
+
+    original_matrix = so.pixels
+    new_matrix = np.zeros_like(original_matrix, dtype=int)
+
+    for i in tqdm.tqdm(range(original_matrix.shape[0])):
+        for j in range(original_matrix.shape[1]):
+            spot_id = original_matrix[i, j]
+            if spot_id != -1 and spot_id in spots_dict_new:
+                cell_dict = spots_dict_new[spot_id]
+                if cell_dict:
+                    cells = list(cell_dict.keys())
+                    chosen_cell_id = np.random.choice(cells, p=list(cell_dict.values()))
+                    new_matrix[i, j] = chosen_cell_id
+
+    so.pixels_cells = new_matrix
 
     return adata_sc_final
