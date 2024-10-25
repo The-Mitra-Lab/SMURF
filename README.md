@@ -2,11 +2,11 @@
 
 Welcome to the SMURF repository!
 
-## Installation
+# Installation
 
 You can install SMURF directly from its GitHub repository. Here’s how you can do it:
 
-### Standard Installation
+## Standard Installation
 
 To install the latest version of SMURF, run the following command:
 
@@ -20,28 +20,28 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[advanced]"
 ```
 
 
-## Tutorial
+# Tutorial
 
 We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
 
 We rely on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example
 
-### PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
+## PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
-### Simple version.
+## Simple version.
 
-### Full version (GPU needed).
+## Full version (GPU needed).
 
 
-## Introduction for fmportant functions and object.
+# Introduction for fmportant functions and object.
 
 Here are some tips for using `so`.
 
-### `SO` Important Features:
+## `SO` Important Features:
 
 - **`so.image_temp()`**
   - Provides the image portion covered by spots.
@@ -55,10 +55,10 @@ Here are some tips for using `so`.
 - **`So.final_nuclei`**
   - Stores the nuclei * genes `adata` matrix.
 
-###  `SO` Beautiful Visualization:
+##  `SO` Beautiful Visualization:
 
 
-#### 1. `plot_cellcluster_position(cell_cluster_final, col_num=5)`
+### 1. `plot_cellcluster_position(cell_cluster_final, col_num=5)`
 
 This function is often used after `return_celltype_plot` as:
 
@@ -72,7 +72,7 @@ su.plot_cellcluster_position(cell_cluster_final, col_num=5)
 
 It plots the probability of each cell cluster. The first plot will contain all clusters, followed by one plot per cluster.
 
-#### 2. `plot_results(original_image, result_image, transparency=0.6, transparent_background=False, include_label=None, colors=None, dpi=1500, figsize=(20, 20), save=None)`
+### 2. `plot_results(original_image, result_image, transparency=0.6, transparent_background=False, include_label=None, colors=None, dpi=1500, figsize=(20, 20), save=None)`
 
 This function allows you to plot results with the same format as So.segmentation_final mapped onto so.image_temp().
 
