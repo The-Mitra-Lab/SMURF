@@ -22,7 +22,20 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[advanced]"
 
 ## Tutorial
 
-First of all, here is a brief introduction to the cell segmentation of **SMURF**. We rely on external packages for nuclei segmentation and create an `so` (spatial object) for further analysis. Here are some tips for using `so`.
+We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
+
+We rely on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example
+
+### PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
+
+### Simple version.
+
+### Full version (GPU needed).
+
+
+## Introduction for fmportant functions and object.
+
+Here are some tips for using `so`.
 
 ### `SO` Important Features:
 
@@ -48,6 +61,7 @@ This function is often used after `return_celltype_plot` as:
 **Example:**
 
 ```python
+import smurf as su
 cell_cluster_final = su.return_celltype_plot(adata_sc, so, cluster_name='leiden')
 su.plot_cellcluster_position(cell_cluster_final, col_num=5)
 ```
@@ -86,3 +100,10 @@ This function allows you to plot results with the same format as So.segmentation
 
 - **`save`** *(str or None, optional)*:
   - The filename to save the plot. If `False` or `None`, the plot will be shown but not saved.
+
+**Example:**
+
+```python
+import smurf as su
+su.su.plot_results(so.image_temp(), so.pixels_cells)
+```
