@@ -28,6 +28,8 @@ We rely on external packages for nuclei segmentation and create an so (spatial o
 
 ### PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
 
+[link](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
+
 ### Simple version.
 
 ### Full version (GPU needed).
