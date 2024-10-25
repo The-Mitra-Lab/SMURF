@@ -15,7 +15,8 @@ except ImportError:
 
 
 def softmax_1(x):
-    e_x = np.exp(x - np.max(x, axis=0))  # subtract max for numerical stability
+    # Custom softmax function for NumPy arrays
+    e_x = np.exp(x - np.max(x, axis=0))  # Subtract max for numerical stability
     return e_x / e_x.sum(axis=0)
 
 
@@ -33,6 +34,7 @@ def start_optimization(
     print_memory=False,
 ):
 
+    # Function to start the optimization process using PyTorch
     if (
         torch is None
         or nn is None
@@ -45,6 +47,7 @@ def start_optimization(
         )
 
     class CustomLayer(nn.Module):
+        # Custom neural network layer
         def __init__(
             self, num_spots, num_cells, nonzero_indices, device, A, C_D, C_true
         ):
@@ -64,13 +67,15 @@ def start_optimization(
             )
 
         def forward(self, x):
-
+            # Forward pass of the model
             batch_size = x.size(0)
             # batch_size = 1
             output = torch.zeros(batch_size, self.num_cells).to(x.device)
 
             for i, indices in enumerate(self.nonzero_indices):
+                # Apply softmax to weights to get normalized weights
                 normalized_weights = torch.softmax(self.weights[i], dim=0)
+                # Update the output tensor with weighted values
                 output[i, indices] = x[:, i].unsqueeze(1)[i, :] * normalized_weights
             return output
 
@@ -78,6 +83,7 @@ def start_optimization(
             self, num_epochs=1000, learning_rate=0.1, print_each=100, epsilon=1e-3
         ):
 
+            # Training function for the custom layer
             optimizer = optim.Adam(self.parameters(), lr=0.1)
 
             losses = []
@@ -85,21 +91,25 @@ def start_optimization(
 
             for epoch in range(num_epochs):
                 optimizer.zero_grad()
+                # Compute the predicted cell type matrix
                 C_pred = (
                     torch.matmul(
                         self.A, self.forward(torch.eye(self.num_spots).to(self.device))
                     )
                     + self.C_D
                 )
+                # Calculate loss using cosine similarity
                 loss = 1 - cosine_similarity(C_pred.T, self.C_true).mean()
                 loss.backward()
                 optimizer.step()
                 loss_value = loss.item()
                 losses.append(loss_value)
 
+                # Print loss every 'print_each' epochs
                 if epoch % print_each == 0:
                     print(f"Epoch {epoch+1}, Loss: {loss.item()}")
 
+                # Early stopping if loss improvement is minimal
                 if prev_loss is not None and (prev_loss - loss_value) <= epsilon:
                     print(
                         f"Stopping early at epoch {epoch} due to minimal loss improvement."
@@ -108,10 +118,12 @@ def start_optimization(
 
                 prev_loss = loss_value
 
+    # Set the random seed for reproducibility
     torch.manual_seed(random_seed)
 
     spot_cell_dic = {}
 
+    # Iterate over each cell group
     for cell_num in spots_X.keys():
 
         print("Group " + str(cell_num) + ":")
@@ -119,10 +131,12 @@ def start_optimization(
         num_spots = spots_X[cell_num].shape[0]
         num_cells = celltype_X[cell_num].shape[0]
 
+        # Convert NumPy arrays to PyTorch tensors and move to the specified device
         A = torch.from_numpy(spots_X[cell_num].T).float().to(device)
         C_true = torch.from_numpy(celltype_X[cell_num]).float().to(device)
         C_D = torch.from_numpy(cells_X_plus[cell_num].T).float().to(device)
 
+        # Initialize and train the model for the current group
         model = CustomLayer(
             num_spots, num_cells, nonzero_indices_dic[cell_num], device, A, C_D, C_true
         ).to(device)
@@ -133,6 +147,7 @@ def start_optimization(
             epsilon=epsilon,
         )
 
+        # Extract the learned weights from the model
         arrays = [p.detach().numpy() for p in model.weights.to("cpu")]
         spot_cell_dic[cell_num] = [list(softmax_1(np.array(arr))) for arr in arrays]
 

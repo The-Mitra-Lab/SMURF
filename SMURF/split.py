@@ -67,19 +67,23 @@ def make_preparation(
     cells_final, so, adatas_final, adata, weight_to_celltype, maximum_cells=10000
 ):
 
+    """
+    Prepares data for optimization by organizing cells and spots, calculating weights,
+    and grouping cells for computational efficiency.
+    """
     epsilon = 1e-8
 
     weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
         axis=1
     ).reshape(-1, 1)
 
-    x2 = np.array([0.5, 0.5])
-    x3 = np.array([0.33, 0.33, 0.34])
+    x2 = np.array([0.5, 0.5])  # Initial guess for two variables
+    x3 = np.array([0.33, 0.33, 0.34])  # Initial guess for three variables
 
     cons = {"type": "eq", "fun": lambda v: np.sum(v) - 1}
 
-    bounds2 = [(0, 1), (0, 1)]
-    bounds3 = [(0, 1), (0, 1), (0, 1)]
+    bounds2 = [(0, 1), (0, 1)]  # Bounds for two variables
+    bounds3 = [(0, 1), (0, 1), (0, 1)]  # Bounds for three variables
 
     spots_final_cells = {}
 
@@ -105,16 +109,22 @@ def make_preparation(
     to_ml = []
     data_temp = csr_matrix(adata.X)
 
+    # Process each spot based on the number of cell types it contains
     for spot_id in tqdm.tqdm(list(spots_final_cells.keys())):
+
         if len(spots_final_cells[spot_id]) == 1:
+            # Single cell in the spot
             cells_before_ml[spots_final_cells[spot_id][0]].append([spot_id, 1])
 
-        if len(spots_final_cells[spot_id]) > 1:
+        elif len(spots_final_cells[spot_id]) > 1:
+            # Multiple cells in the spot
             cell_types_all = set([])
             for cell_id in spots_final_cells[spot_id]:
                 cell_types_all = cell_types_all | set([cell_types[cell_id]])
             cell_types_all_list = list(cell_types_all)
+
             if len(cell_types_all) == 1:
+                # All cells are of the same type
                 # print(spot_id, spots_final_cells[spot_id], cell_types_all)
                 to_ml.append(
                     [
@@ -125,7 +135,9 @@ def make_preparation(
                         cell_types_all,
                     ]
                 )
-            if len(cell_types_all) == 2:
+
+            elif len(cell_types_all) == 2:
+                # Two different cell types
                 A = weight_to_celltype_norm[cell_types_all_list[0]]
                 B = weight_to_celltype_norm[cell_types_all_list[1]]
                 C = data_temp[spot_id] / data_temp[spot_id].sum()
@@ -195,6 +207,7 @@ def make_preparation(
                                 )
 
             elif len(cell_types_all) == 3:
+                # Three different cell types
                 A = weight_to_celltype_norm[cell_types_all_list[0]]
                 B = weight_to_celltype_norm[cell_types_all_list[1]]
                 C = weight_to_celltype_norm[cell_types_all_list[2]]
@@ -272,6 +285,7 @@ def make_preparation(
                                     ]
                                 )
 
+    # Prepare data for machine learning
     cells_before_ml_x = {}
     for cell_id in cells_before_ml.keys():
         cells_before_ml_x[cell_id] = np.zeros([data_temp.shape[1]])
@@ -279,10 +293,12 @@ def make_preparation(
     for cell_id in cells_before_ml.keys():
         for i in cells_before_ml[cell_id]:
             if len(i) == 2:
+                # Full assignment of spot to cell
                 cells_before_ml_x[cell_id] = (
                     cells_before_ml_x[cell_id] + data_temp[i[0]]
                 )
             else:
+                # Partial assignment based on calculated weights
                 # print(cells_before_ml[cell_id])
                 A = i[1] * weight_to_celltype_norm[i[3]]
                 B = (1 - i[1]) * weight_to_celltype_norm[
@@ -323,8 +339,8 @@ def make_preparation(
         groups = find_connected_groups(lst)
     #  print(len(groups),find_length_of_largest_list(groups))
 
+    # Group cells to limit computational load
     groups_combined = {}
-
     total = 0
     start = 0
 
@@ -345,11 +361,13 @@ def make_preparation(
                     total = total + len(group)
                     groups_combined[start] = groups_combined[start] + group
 
+    # Map cells to groups
     cells_to_groups = {}
     for group in groups_combined.keys():
         for cell in groups_combined[group]:
             cells_to_groups[cell] = group
 
+    # Prepare dictionaries for grouped data
     cells_toml_dic = {}
     spots_toml_dic = {}
     nonzero_indices_dic = {}
@@ -371,6 +389,7 @@ def make_preparation(
         nonzero_indices_dic[ct].append(to_ml[i][1])
         pct_toml_dic[ct].append([to_ml[i][0], to_ml[i][2], to_ml[i][3], to_ml[i][4]])
 
+    # Map cells to IDs within groups
     cells_toid_toml_dic = {}
     id_tocells_toml_dic = {}
 
@@ -386,6 +405,7 @@ def make_preparation(
                 id_tocells_toml_dic[i][num] = int(cells_toml_dic[i][j])
                 num += 1
 
+    # Update nonzero indices with new IDs
     nonzero_indices_toml = copy.deepcopy(nonzero_indices_dic)
 
     for i in groups_combined.keys():
@@ -395,12 +415,14 @@ def make_preparation(
                     nonzero_indices_dic[i][j][k]
                 ]
 
+    # Prepare matrices for optimization
     cells_X_plus_dic = {}
     spots_X_dic = {}
     celltypes_dic = {}
     spots_id_dic = {}
     spots_id_dic_prop = {}
 
+    # Prepare spot data
     for i in groups_combined.keys():
         cells_X_plus_dic[i] = np.zeros((len(cells_toid_toml_dic[i]), adata.shape[1]))
         celltypes_dic[i] = np.zeros((len(cells_toid_toml_dic[i]), adata.shape[1]))
@@ -468,6 +490,10 @@ def calculate_distances(A, C):
 
 def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
 
+    """
+    Calculates the weight matrix mapping cell types to gene expression profiles.
+    """
+
     cell_ids = list(adatas_final.obs.index.astype(float))
 
     data_temp = csr_matrix(adata.X)
@@ -511,11 +537,16 @@ def get_finaldata(
     so=None,
 ):
 
+    """
+    Combines cell and spot data after optimization to generate the final single-cell dataset.
+    """
+
     binnumbers = {}
     epsilon = 1e-8
 
     data_temp = csr_matrix(adata.X)
 
+    # Initialize cells_before_ml_x if not provided
     if cells_before_ml_x == None:
         cells_before_ml_x = {}
         for cell_id in cells_before_ml.keys():
@@ -560,9 +591,10 @@ def get_finaldata(
                 else:
                     binnumbers[cell_id] = binnumbers[cell_id] + i[1]
 
+    # Prepare spot data if not provided
     if spots_X_dic == None:
 
-        if nonzero_indices_toml != None:
+        if nonzero_indices_toml is not None:
 
             spots_X_dic = {}
 
@@ -618,18 +650,19 @@ def get_finaldata(
     np.random.seed(0)
 
     num_temp = np.zeros([data_temp.shape[1]])
-    # cells_after_ml = copy.deepcopy(cells_before_ml_x)
 
     cellid_to_index = {}
 
     final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
     cell_index = list(adatas_final.obs.index)
 
+    # Combine data from cells_before_ml_x
     for i in range(len(cell_index)):
         cell_id = float(cell_index[i])
         cellid_to_index[cell_id] = i
         final_X[i] = csr_matrix(cells_before_ml_x[cell_id])
 
+    # Assign counts from optimization results to cells
     for i in groups_combined.keys():
         for j in range(len(pct_toml_dic[i])):
             for k in range(len(nonzero_indices_dic[i][j])):
@@ -650,6 +683,7 @@ def get_finaldata(
                     binnumbers[cell_id] + spot_cell_dic[i][j][k] * pct_toml_dic[i][j][1]
                 )
 
+    # Prepare cell information
     if so == None:
         cell_info = np.zeros([len(adatas_final.obs), 3])
 
@@ -715,7 +749,13 @@ def get_finaldata(
     return adata_sc_final
 
 
-def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype):
+def get_finaldata_fast(
+    cells_final, so, adatas_final, adata, weight_to_celltype, plot=True
+):
+
+    """
+    Fast version to get the final data. Suitable for users with no GPU resources.
+    """
 
     weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
         axis=1
@@ -1055,52 +1095,56 @@ def get_finaldata_fast(cells_final, so, adatas_final, adata, weight_to_celltype)
         var=adata.var,
     )
 
-    keys = list(spots_composition.keys())
-    for i in keys:
-        if len(spots_composition[i]) == 0:
-            del spots_composition[i]
-        elif abs(sum(spots_composition[i].values()) - 1) > 0.0001:
-            raise ValueError("Proportion Sum for spot " + str(i) + " is not 1.")
-        else:
+    # Optionally plot the cells on the spatial map
+    if plot:
+        keys = list(spots_composition.keys())
+        for i in keys:
+            if len(spots_composition[i]) == 0:
+                del spots_composition[i]
+            elif abs(sum(spots_composition[i].values()) - 1) > 0.0001:
+                raise ValueError("Proportion Sum for spot " + str(i) + " is not 1.")
+            else:
+                for k in spots_composition[i].keys():
+                    spots_composition[i][k] = spots_composition[i][k] / sum(
+                        spots_composition[i].values()
+                    )
+
+        keys = list(spots_composition.keys())
+        for i in keys:
             for k in spots_composition[i].keys():
                 spots_composition[i][k] = spots_composition[i][k] / sum(
                     spots_composition[i].values()
                 )
 
-    keys = list(spots_composition.keys())
-    for i in keys:
-        for k in spots_composition[i].keys():
-            spots_composition[i][k] = spots_composition[i][k] / sum(
-                spots_composition[i].values()
-            )
+        df1 = copy.deepcopy(adata.obs)
+        df1["barcode"] = df1.index
 
-    df1 = copy.deepcopy(adata.obs)
-    df1["barcode"] = df1.index
+        df2 = copy.deepcopy(so.df)
+        df2["index"] = df2.index
 
-    df2 = copy.deepcopy(so.df)
-    df2["index"] = df2.index
+        df = pd.merge(df1, df2, on=["barcode"], how="inner")
+        df_index = np.array(df["index"])
 
-    df = pd.merge(df1, df2, on=["barcode"], how="inner")
-    df_index = np.array(df["index"])
+        spots_dict_new = {}
 
-    spots_dict_new = {}
+        for i in spots_composition.keys():
+            spots_dict_new[df_index[i]] = spots_composition[i]
 
-    for i in spots_composition.keys():
-        spots_dict_new[df_index[i]] = spots_composition[i]
+        original_matrix = so.pixels
+        new_matrix = np.zeros_like(original_matrix, dtype=int)
 
-    original_matrix = so.pixels
-    new_matrix = np.zeros_like(original_matrix, dtype=int)
+        for i in tqdm.tqdm(range(original_matrix.shape[0])):
+            for j in range(original_matrix.shape[1]):
+                spot_id = original_matrix[i, j]
+                if spot_id != -1 and spot_id in spots_dict_new:
+                    cell_dict = spots_dict_new[spot_id]
+                    if cell_dict:
+                        cells = list(cell_dict.keys())
+                        chosen_cell_id = np.random.choice(
+                            cells, p=list(cell_dict.values())
+                        )
+                        new_matrix[i, j] = chosen_cell_id
 
-    for i in tqdm.tqdm(range(original_matrix.shape[0])):
-        for j in range(original_matrix.shape[1]):
-            spot_id = original_matrix[i, j]
-            if spot_id != -1 and spot_id in spots_dict_new:
-                cell_dict = spots_dict_new[spot_id]
-                if cell_dict:
-                    cells = list(cell_dict.keys())
-                    chosen_cell_id = np.random.choice(cells, p=list(cell_dict.values()))
-                    new_matrix[i, j] = chosen_cell_id
-
-    so.pixels_cells = new_matrix
+        so.pixels_cells = new_matrix
 
     return adata_sc_final

@@ -21,6 +21,9 @@ from .spatial_object import spatial_object
 
 @jit(nopython=True)
 def fill_pixels(pixels, row_starts, row_ends, col_starts, col_ends, indices):
+
+    # Function to speed up
+    # Fill each region in the pixels array with the corresponding index
     for i in range(len(indices)):
         pixels[row_starts[i] : row_ends[i], col_starts[i] : col_ends[i]] = indices[i]
 
@@ -30,9 +33,17 @@ def fill_pixels(pixels, row_starts, row_ends, col_starts, col_ends, indices):
 def prepare_dataframe_image(
     df_path: "square_002um/spatial/tissue_positions.parquet",
     img_path: "Visium_HD_Mouse_Small_Intestine_tissue_image.btf",
+    image_format="HE",
     row_number=3350,
     col_nuber=3350,
 ):
+
+    """
+    This function is to map the image to spots.
+    """
+
+    if image_format not in ["HE", "DAPI"]:
+        raise ValueError("image_format must be in ['HE','DAPI']")
 
     # read image
     Image.MAX_IMAGE_PIXELS = None  # Removes the limit entirely
@@ -48,28 +59,36 @@ def prepare_dataframe_image(
 
         print(f"Error opening or processing image: {e}")
 
+    # Read the Parquet file into a DataFrame
     df = pd.read_parquet(df_path, engine="pyarrow")
 
+    # Calculate the average row and column sizes
     avg_row = (df["pxl_row_in_fullres"].max() - df["pxl_row_in_fullres"].min()) / (
         2 * row_number
     )
     avg_col = (df["pxl_col_in_fullres"].max() - df["pxl_col_in_fullres"].min()) / (
         2 * col_nuber
     )
+
+    # Calculate the left, right, top, and bottom pixel boundaries for each spot
     df["pxl_row_left_in_fullres"] = df["pxl_row_in_fullres"] - avg_row
     df["pxl_row_right_in_fullres"] = df["pxl_row_in_fullres"] + avg_row
     df["pxl_col_up_in_fullres"] = df["pxl_col_in_fullres"] - avg_col
     df["pxl_col_down_in_fullres"] = df["pxl_col_in_fullres"] + avg_col
+
+    # Round the boundaries to integers
     df["pxl_row_left_in_fullres"] = df["pxl_row_left_in_fullres"].round().astype(int)
     df["pxl_row_right_in_fullres"] = df["pxl_row_right_in_fullres"].round().astype(int)
     df["pxl_col_up_in_fullres"] = df["pxl_col_up_in_fullres"].round().astype(int)
     df["pxl_col_down_in_fullres"] = df["pxl_col_down_in_fullres"].round().astype(int)
 
+    # Determine the range of spots that are in tissue
     start_row_spot = df[(df["in_tissue"] == 1)]["array_row"].min()
     end_row_spot = df[(df["in_tissue"] == 1)]["array_row"].max() + 1
     start_col_spot = df[(df["in_tissue"] == 1)]["array_col"].min()
     end_col_spot = df[(df["in_tissue"] == 1)]["array_col"].max() + 1
 
+    # Create a temporary DataFrame with spots in the specified range
     df_temp = df[
         (df["array_row"] >= start_row_spot)
         & (df["array_row"] < end_row_spot)
@@ -77,11 +96,13 @@ def prepare_dataframe_image(
         & (df["array_col"] < end_col_spot)
     ].copy()
 
+    # Calculate the cropped image boundaries
     row_left = max(df_temp["pxl_row_left_in_fullres"].min(), 0)
     row_right = df_temp["pxl_row_right_in_fullres"].max()
     col_up = max(df_temp["pxl_col_up_in_fullres"].min(), 0)
     col_down = df_temp["pxl_col_down_in_fullres"].max()
 
+    # Adjust the pixel boundaries relative to the cropped image
     df_temp.loc[:, "pxl_row_left_in_fullres_temp"] = (
         df_temp.loc[:, "pxl_row_left_in_fullres"] - row_left
     )
@@ -95,15 +116,19 @@ def prepare_dataframe_image(
         df_temp.loc[:, "pxl_col_down_in_fullres"] - col_up
     )
 
+    # Extract the start and end positions for rows and columns
     row_starts = df_temp["pxl_row_left_in_fullres_temp"].values
     row_ends = df_temp["pxl_row_right_in_fullres_temp"].values
     col_starts = df_temp["pxl_col_up_in_fullres_temp"].values
     col_ends = df_temp["pxl_col_down_in_fullres_temp"].values
     indices = df_temp.index.to_numpy()
 
+    # Initialize the pixels array with -1
     pixels = -1 * np.ones(image_array[row_left:row_right, col_up:col_down].shape[:2])
+    # Fill the pixels array
     pixels = fill_pixels(pixels, row_starts, row_ends, col_starts, col_ends, indices)
 
+    # Return a spatial object with relevant data
     return spatial_object(
         image_array,
         df,
@@ -117,11 +142,17 @@ def prepare_dataframe_image(
         col_up,
         col_down,
         pixels,
+        image_format,
     )
 
 
 def nuclei_rna(adata, so, min_percent=0.4):
 
+    """
+    This is to create a anndata object for nuclei.
+    """
+
+    # Create a mapping from spot positions to indices in the adata object
     set_toindex_data = {}
     indexes = list(adata.obs.index)
     for i in range(len(indexes)):
@@ -140,11 +171,13 @@ def nuclei_rna(adata, so, min_percent=0.4):
     data_temp = csr_matrix(adata.X)
     final_data = lil_matrix((len(so.cell_ids), data_temp.shape[1]))
 
-    # for cell_id in [103]:
+    # Get and sort the cell IDs
     cell_ids = copy.deepcopy(so.cell_ids)
     cell_ids = np.sort(np.array(cell_ids))
+
     for cell_id in tqdm.tqdm(cell_ids):
 
+        # Initialize sets for the cell
         set_cell = set()
         set_tobe = set()
         set_exclude = set()
@@ -152,6 +185,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
         rows = []
         cols = []
 
+        # Get the array_row and array_col for each spot in the cell
         for spot_id in so.cells_main[cell_id]:
             rows.append(so.df.loc[spot_id, "array_row"])
             cols.append(so.df.loc[spot_id, "array_col"])
@@ -166,14 +200,16 @@ def nuclei_rna(adata, so, min_percent=0.4):
         col_min = {}
         col_max = {}
 
+        # Initialize min and max dictionaries for rows and columns
         for row in set(rows):
-            row_min[row] = 100000000
+            row_min[row] = float("inf")
             row_max[row] = 0
 
         for col in set(cols):
-            col_min[col] = 100000000
+            col_min[col] = float("inf")
             col_max[col] = 0
 
+        # Update min and max values for rows and columns
         for i in range(len(so.cells_main[cell_id])):
 
             if data_cells[0, i] < col_min[data_cells[1, i]]:
@@ -188,6 +224,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
             if data_cells[1, i] > row_max[data_cells[0, i]]:
                 row_max[data_cells[0, i]] = data_cells[1, i]
 
+        # Filter the set_cell to be within valid spot ranges
         set_cell = {
             tup
             for tup in set_cell
@@ -201,6 +238,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
         set_cells[cell_id] = set_cell
         length_main[cell_id] = len(set_cell)
 
+        # Find neighboring spots to consider
         for col, row in col_min.items():
             if (row - 1, col) in set_toindex_data:
                 set_tobe.add((row - 1, col))
@@ -217,6 +255,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
             if (row, col + 1) in set_toindex_data:
                 set_tobe.add((row, col + 1))
 
+        # Filter set_tobe to be within valid spot ranges
         set_tobe = {
             tup
             for tup in set_tobe
@@ -240,6 +279,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
         set_tobes[cell_id] = set_tobe
         set_excludes[cell_id] = set_exclude
 
+        # Build the cell matrix by summing expression values
         cell_matrix[cell_id] = [
             set_toindex_data[key] for key in set_cell if key in set_toindex_data
         ]
@@ -249,6 +289,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
         final_data[i_num] = cell_matrix[cell_id]
         i_num = i_num + 1
 
+    # Update the spatial object with new attributes
     so.set_toindex_data = copy.deepcopy(set_toindex_data)
     so.set_cells = copy.deepcopy(set_cells)
     so.set_tobes = copy.deepcopy(set_tobes)
@@ -258,6 +299,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
 
     cell_ids_str = [str(cell_id) for cell_id in cell_ids]
 
+    # Create a new AnnData object for the final nuclei
     so.final_nuclei = anndata.AnnData(
         X=copy.deepcopy(csr_matrix(final_data)),
         obs=pd.DataFrame([], index=cell_ids_str),
@@ -278,12 +320,19 @@ def singlecellanalysis(
     show=True,
 ):
 
+    """
+    This function is for regular single cell analysis for iterations.
+    """
+
+    # Ignore warnings related to sparse matrices and IOStream
     warnings.simplefilter("ignore", SparseEfficiencyWarning)
     warnings.filterwarnings("ignore", message="IOStream.flush timed out")
 
     if show:
         print("Starting mt")
+    # Filter genes expressed in at least 3 cells
     sc.pp.filter_genes(adata, min_cells=3)
+    # Calculate QC metrics
     adata.var["mt"] = adata.var_names.str.startswith("mt-")
     sc.pp.calculate_qc_metrics(
         adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
@@ -291,20 +340,26 @@ def singlecellanalysis(
 
     if show:
         print("Starting normalization")
+    # Normalize the data and log-transform
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
+    # Identify highly variable genes
     sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
     adata = adata[:, adata.var.highly_variable].copy()
     if regress_out:
+        # Regress out effects of total counts and mitochondrial percentage
         sc.pp.regress_out(adata, ["total_counts", "pct_counts_mt"])
+    # Scale the data
     sc.pp.scale(adata, max_value=10)
 
     if show:
         print("Starting PCA")
+    # Perform PCA
     sc.tl.pca(adata, svd_solver="arpack", random_state=random_state)
 
     if show:
         print("Starting UMAP")
+    # Compute the neighborhood graph and UMAP embedding
     sc.pp.neighbors(
         adata,
         n_neighbors=10,
@@ -315,6 +370,7 @@ def singlecellanalysis(
 
     if show:
         print("Starting Clustering")
+    # Perform Leiden clustering
     sc.tl.leiden(
         adata,
         resolution=resolution,
@@ -324,6 +380,7 @@ def singlecellanalysis(
     )
 
     if show:
+        # Plot the UMAP with clusters
         if save:
             sc.pl.umap(adata, color=["leiden"], save=str(i) + "_umap.png")
         elif save == False:
@@ -338,8 +395,13 @@ def expanding_cells(
     so, adata_sc, weights, iter_cells, data_temp, min_percent=0.4, cortex=False
 ):
 
+    """
+    This function is for expanding cells.
+    """
+
     cells_final = {}
 
+    # Get cell IDs and types
     cell_ids = copy.deepcopy(list(adata_sc.obs.index.astype(float)))
     total_num = len(cell_ids)
     celltypes = copy.deepcopy(list(adata_sc.obs.leiden.astype(int)))
@@ -347,6 +409,7 @@ def expanding_cells(
     length_final = -1 * np.ones([total_num, 1])
     final_data = copy.deepcopy(lil_matrix((total_num, data_temp.shape[1])))
 
+    # Define a function to fill in points to make the cell region more compact
     def fill_points(points):
 
         point_set1 = set(map(tuple, points))
@@ -372,34 +435,36 @@ def expanding_cells(
         cell_id = cell_ids[i_num]
         cell_type = celltypes[i_num]
 
+        # Get the initial sets and cell matrix
         set_cell = copy.deepcopy(so.set_cells[cell_id])
         set_tobe = copy.deepcopy(so.set_tobes[cell_id])
         set_exclude = copy.deepcopy(so.set_excludes[cell_id])
         cell_matrix = copy.deepcopy(so.cell_matrix[cell_id])
 
+        # Calculate the initial score
         score = (np.dot(cell_matrix, weights[cell_type]) / norm(cell_matrix))[0, 0]
         tobe_considered = set_tobe - set_cell - set_exclude
         i = 0
 
+        # Begin expanding the cell region
         while len(tobe_considered) != 0:
             for row, col in tobe_considered:
                 cell_matrix_temp = (
                     data_temp[so.set_toindex_data[(row, col)], :] + cell_matrix
                 )
-                # cell_matrix_norm = 10000*cell_matrix_temp/cell_matrix_temp.sum()
 
                 score_temp = (
                     np.dot(cell_matrix_temp, weights[cell_type])
                     / norm(cell_matrix_temp)
                 )[0, 0]
 
-                if (
-                    score_temp > score
-                ):  # data_temp[set_toindex[(row,col)],:].sum() == 0:
-                    # print(score_temp)
+                if score_temp > score:
+
+                    # If the score improves, update the cell region
                     set_cell.update([(row, col)])
                     cell_matrix = cell_matrix_temp
 
+                    # Check neighboring spots and update set_tobe or set_exclude
                     if (
                         row - 1 >= so.start_row_spot
                         and (row - 1, col) in so.set_toindex_data
@@ -485,6 +550,7 @@ def expanding_cells(
         cellscore[i_num] = score
         final_data[i_num] = copy.deepcopy(cell_matrix)
 
+    # make results cortex
     if cortex:
         for i_num in range(total_num):
 
@@ -537,6 +603,8 @@ def expanding_cells(
             cell_type = celltypes[i_num]
 
             points = np.array(list(cells_final[cell_id]))
+
+            # Fill in the points to make the cell region more continuous
             cells_final[cell_id] = fill_points(points)
 
             set_cell_index = [
@@ -558,42 +626,49 @@ def expanding_cells(
 
 def return_celltype_plot(adata_sc, so, cluster_name="leiden"):
 
-    segmentation_final = so.segmentation_final
-
-    cell_type_final = np.zeros(segmentation_final.shape)
+    # Initialize an array to hold the final cell type assignments
+    cell_type_final = np.zeros(so.segmentation_final.shape)
     cell_type_dic = {}
     cell_ids = list(adata_sc.obs.index)
     cell_types = list(adata_sc.obs[cluster_name])
 
+    # Create a dictionary mapping cell IDs to their cluster types (adding 1 to avoid zero indexing)
     for i in range(len(adata_sc)):
         cell_type_dic[float(cell_ids[i])] = int(cell_types[i]) + 1
 
+    # Iterate over each pixel in the segmentation to assign cell types
     for i in tqdm.tqdm(range(cell_type_final.shape[0])):
         for j in range(cell_type_final.shape[1]):
-            cell_id = segmentation_final[i, j]
+            cell_id = so.segmentation_final[i, j]
 
             if cell_id != 0:
                 try:
+                    # Assign the cell type to the corresponding pixel in the final array
                     cell_type_final[i, j] = cell_type_dic[cell_id]
                 except:
-                    1
+                    pass
 
     return cell_type_final
 
 
 def plot_celltype_position(cell_type_final, col_num=5):
 
+    # Determine the maximum cell type value
     max_type = int(np.max(cell_type_final))
 
+    # Calculate total number of plots and the number of rows needed
     total_plots = max_type + 1
     rows = (total_plots + col_num - 1) // col_num
 
+    # Get a colormap with enough colors for all cell types
     cmap = plt.get_cmap("tab20b", max_type + 2)
 
+    # Create subplots with the calculated number of rows and columns
     fig, axs = plt.subplots(
         nrows=rows, ncols=col_num, figsize=(12 * col_num, 12 * rows)
     )
 
+    # Plot the overall distribution of all cell types
     ax = axs[0, 0]
     im = ax.imshow(cell_type_final, cmap=cmap, vmin=1, vmax=max_type)
     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
@@ -602,202 +677,19 @@ def plot_celltype_position(cell_type_final, col_num=5):
     ax.set_title("Distribution of All Cell Types", size=14)
     ax.axis("off")
 
+    # Plot individual cell types
     for i in range(1, max_type + 1):
         ax = axs[(i) // col_num, (i) % col_num]
         ax.imshow(np.squeeze(np.array(cell_type_final == i)), cmap=cmap, vmin=0, vmax=1)
         ax.axis("off")
         ax.set_title("Cell type " + str(i), size=14)
 
+    # Turn off any unused subplots
     for i in range(total_plots, rows * col_num):
         axs[i // col_num, i % col_num].axis("off")
 
+    # Adjust layout and display the plot
     plt.tight_layout()
-    plt.show()
-    plt.close()
-
-
-def plot_colors_with_indices(ax, colors=None):
-
-    if colors == None:
-
-        colors = [
-            (172, 106, 88),
-            (203, 205, 199),
-            (135, 36, 197),
-            (138, 76, 124),
-            (208, 67, 111),
-            (195, 190, 120),
-            (53, 137, 24),
-            (218, 161, 52),
-            (212, 229, 95),
-            (214, 154, 126),
-            (201, 147, 47),
-            (96, 35, 35),
-            (38, 116, 230),
-            (69, 170, 54),
-            (223, 96, 36),
-            (197, 213, 195),
-            (29, 101, 119),
-            (186, 109, 121),
-            (127, 202, 188),
-            (76, 216, 34),
-            (108, 190, 202),
-            (75, 64, 110),
-            (109, 76, 90),
-            (141, 92, 60),
-            (74, 84, 82),
-            (45, 166, 110),
-            (93, 149, 201),
-            (100, 68, 27),
-            (167, 158, 108),
-            (157, 151, 133),
-            (24, 52, 56),
-            (47, 51, 169),
-            (123, 113, 91),
-            (103, 162, 189),
-            (176, 28, 225),
-            (129, 49, 52),
-            (114, 103, 104),
-            (69, 118, 27),
-            (25, 104, 216),
-            (71, 117, 103),
-            (200, 110, 26),
-            (143, 48, 142),
-            (163, 211, 182),
-            (140, 149, 222),
-            (223, 68, 30),
-            (208, 155, 75),
-            (132, 190, 119),
-            (223, 67, 163),
-            (170, 181, 219),
-            (145, 220, 27),
-        ]
-
-    for i, color in enumerate(colors):
-        color_normalized = [x / 255 for x in color]
-        rect = patches.Rectangle(
-            (i, 0), 1, 1, linewidth=1, edgecolor="none", facecolor=color_normalized
-        )
-        ax.add_patch(rect)
-        ax.text(
-            i + 0.5,
-            0.5,
-            str(i),
-            color="white" if sum(color_normalized[:3]) < 1.5 else "black",
-            ha="center",
-            va="center",
-            fontsize=8,
-            fontweight="bold",
-        )
-    ax.set_xlim(0, len(colors))
-    ax.set_ylim(0, 1)
-    ax.axis("off")
-
-
-def plot_image_with_overlay(ax, so, cell_type_final, colors):
-    img_np = so.image_temp()
-
-    if img_np.dtype != np.uint8:
-        img_np = (img_np * 255).astype(np.uint8)
-
-    if img_np.shape[2] == 3:
-        img_np = np.dstack(
-            [img_np, np.ones((img_np.shape[0], img_np.shape[1]), dtype=np.uint8) * 255]
-        )
-
-    overlay = np.full(
-        (img_np.shape[0], img_np.shape[1], 4), [0, 0, 0, 0], dtype=np.uint8
-    )
-    for i in tqdm.tqdm(range(1, int(cell_type_final.max()) + 1)):
-        ct = np.array(cell_type_final == i)
-        overlay[:, :, 0] = overlay[:, :, 0] + colors[i - 1][0] * ct
-        overlay[:, :, 1] = overlay[:, :, 1] + colors[i - 1][1] * ct
-        overlay[:, :, 2] = overlay[:, :, 2] + colors[i - 1][2] * ct
-        overlay[:, :, 3] = overlay[:, :, 3] + int(255) * ct
-
-    result = np.zeros_like(img_np)
-    for c in range(4):
-        result[:, :, c] = (
-            img_np[:, :, c] * (1 - overlay[:, :, 3] / 255)
-            + overlay[:, :, c] * (overlay[:, :, 3] / 255)
-        ).astype(np.uint8)
-
-    ax.imshow(result)
-
-
-def plot_whole(so, cell_type_final, colors=None, save="result_whole_pic.pdf"):
-
-    if colors == None:
-
-        colors = [
-            (172, 106, 88),
-            (203, 205, 199),
-            (135, 36, 197),
-            (138, 76, 124),
-            (208, 67, 111),
-            (195, 190, 120),
-            (53, 137, 24),
-            (218, 161, 52),
-            (212, 229, 95),
-            (214, 154, 126),
-            (201, 147, 47),
-            (96, 35, 35),
-            (38, 116, 230),
-            (69, 170, 54),
-            (223, 96, 36),
-            (197, 213, 195),
-            (29, 101, 119),
-            (186, 109, 121),
-            (127, 202, 188),
-            (76, 216, 34),
-            (108, 190, 202),
-            (75, 64, 110),
-            (109, 76, 90),
-            (141, 92, 60),
-            (74, 84, 82),
-            (45, 166, 110),
-            (93, 149, 201),
-            (100, 68, 27),
-            (167, 158, 108),
-            (157, 151, 133),
-            (24, 52, 56),
-            (47, 51, 169),
-            (123, 113, 91),
-            (103, 162, 189),
-            (176, 28, 225),
-            (129, 49, 52),
-            (114, 103, 104),
-            (69, 118, 27),
-            (25, 104, 216),
-            (71, 117, 103),
-            (200, 110, 26),
-            (143, 48, 142),
-            (163, 211, 182),
-            (140, 149, 222),
-            (223, 68, 30),
-            (208, 155, 75),
-            (132, 190, 119),
-            (223, 67, 163),
-            (170, 181, 219),
-            (145, 220, 27),
-        ]
-
-    # Create the figure and subplots
-    fig, (ax1, ax2) = plt.subplots(
-        2, 1, figsize=(20.5, 20), gridspec_kw={"height_ratios": [1, 20]}
-    )
-
-    fig.subplots_adjust(hspace=0.05)
-
-    # Plot colors with indices
-    plot_colors_with_indices(ax1, colors[0 : int(cell_type_final.max())])
-
-    # Plot image with overlay
-    # You need to define `so` and `cell_type_final` properly here
-    plot_image_with_overlay(ax2, so, cell_type_final, colors)
-
-    # Save the figure
-    plt.savefig(save, dpi=1000)
     plt.show()
     plt.close()
 
@@ -825,6 +717,7 @@ def itering_arragement(
     adata_type_record[0] = list(adata_sc.obs["leiden"])
     weights_record = {}
 
+    # Initialize weights based on the mean expression of each cluster
     weights = np.zeros((len(np.unique(adata_type_record[0])), adata_raw.shape[1]))
     for i in range(len(np.unique(adata_type_record[0]))):
         weights[i] = adata_raw[adata_sc.obs.leiden == str(i)].X.mean(axis=0)
@@ -837,12 +730,14 @@ def itering_arragement(
     adata_temp = adata_sc
     mis = [0]
 
+    # Recalculate size of cells
     new_length = np.zeros((so.indices.shape[0], 2))
     for i in range(so.indices.shape[0]):
         cell_id = so.cell_ids[i]
         new_length[i, 0] = cell_id
         new_length[i, 1] = so.length_main[cell_id]
 
+    # Compute the initial iterations required for each cell
     re = so.distances[:, 1:4].mean(axis=1) - 2 * np.sqrt(new_length[:, 1] / np.pi)
     iter_cells = {}
     for i in range(so.indices.shape[0]):
@@ -856,8 +751,10 @@ def itering_arragement(
     max_mi = 0
     max_mi_i = 0
 
+    # Begin iterative arrangement
     for i in range(1, 30):
 
+        # Expand cells and update data
         cells_final, final_data, cellscore, length_final = expanding_cells(
             so,
             adata_temp,
@@ -883,12 +780,15 @@ def itering_arragement(
             show=show,
         )
         adata_type_record[i] = list(adata_temp.obs["leiden"])
+
+        # Calculate mutual information score
         mi = normalized_mutual_info_score(
             adata_type_record[i], adata_type_record[i - 1]
         )
         adata_temp.write(save_folder + "adatas_" + str(i) + ".h5ad")
-        # final_Xs[i] = csr_matrix(final_data)
         mis.append(mi)
+
+        # Save progress
         with open(save_folder + "mis.pkl", "wb") as f:
             pickle.dump(mis, f)
         with open(save_folder + "cells_final_" + str(i) + ".pkl", "wb") as f:
@@ -897,7 +797,7 @@ def itering_arragement(
         if show:
             print(mi, i)
         if (i > max_mi_i + 1) and max_mi > mi:
-
+            # If mutual information decreases, restore previous best state
             with open(save_folder + "weights_record.pkl", "wb") as f:
                 pickle.dump(weights_record[max_mi_i], f)
 
@@ -915,22 +815,24 @@ def itering_arragement(
             )
 
             if keep_previous != True:
-                for j in range(max_mi_i + 1, i + 1):
+                # Clean up unnecessary files
+                for j in range(i + 1):
                     try:
                         os.remove(save_folder + "adatas_ini_" + str(j) + ".h5ad")
                         os.remove(save_folder + "adatas_" + str(j) + ".h5ad")
                         os.remove(save_folder + "cells_final_" + str(j) + ".pkl")
                     except:
-                        1
+                        pass
 
             break
 
         else:
-
+            # Update weights if mutual information increases
             if max_mi < mi:
                 max_mi = mi
 
                 if keep_previous != True:
+                    # Remove older files
                     for j in range(max_mi_i, i):
                         try:
                             os.remove(
@@ -941,10 +843,11 @@ def itering_arragement(
                                 save_folder + "cells_final_" + str(max_mi_i) + ".pkl"
                             )
                         except:
-                            1
+                            pass
 
                 max_mi_i = i
 
+            # Recalculate weights
             weights = np.zeros((len(np.unique(adata_type_record[i])), adata.shape[1]))
             for j in range(len(np.unique(adata_type_record[i]))):
                 weights[j] = csr_matrix(final_data)[
@@ -965,15 +868,20 @@ def make_pixels_cells(
     seed=42,
 ):
 
+    # Set the random seed for reproducibility
     np.random.seed(seed)
+
+    # Initialize the spots composition dictionary
     spots_composition = {}
     for i in so.index_toset.keys():
         spots_composition[i] = {}
 
+    # Update the spots composition with cells before machine learning
     for i in cells_before_ml.keys():
         for j in cells_before_ml[i]:
             spots_composition[j[0]][i] = j[1]
 
+    # Update the spots composition with additional cell information
     for i in spot_cell_dic.keys():
         for j in range(len(spot_cell_dic[i])):
             for k in range(len(spot_cell_dic[i][j])):
@@ -981,6 +889,7 @@ def make_pixels_cells(
                     nonzero_indices_dic[i][j][k]
                 ] = (spot_cell_dic[i][j][k] * spots_id_dic_prop[i][j][0])
 
+    # Normalize the proportions in each spot
     keys = list(spots_composition.keys())
     for i in keys:
         if len(spots_composition[i]) == 0:
@@ -1000,6 +909,7 @@ def make_pixels_cells(
                 spots_composition[i].values()
             )
 
+    # Merge dataframes to align indices
     df1 = copy.deepcopy(adata.obs)
     df1["barcode"] = df1.index
 
@@ -1009,14 +919,17 @@ def make_pixels_cells(
     df = pd.merge(df1, df2, on=["barcode"], how="inner")
     df_index = np.array(df["index"])
 
+    # Create a new spots dictionary with updated indices
     spots_dict_new = {}
 
     for i in spots_composition.keys():
         spots_dict_new[df_index[i]] = spots_composition[i]
 
+    # Initialize a new matrix for cell assignments
     original_matrix = so.pixels
     new_matrix = np.zeros_like(original_matrix, dtype=int)
 
+    # Assign cells to pixels based on the spot compositions
     for i in tqdm.tqdm(range(original_matrix.shape[0])):
         for j in range(original_matrix.shape[1]):
             spot_id = original_matrix[i, j]
@@ -1027,55 +940,330 @@ def make_pixels_cells(
                     chosen_cell_id = np.random.choice(cells, p=list(cell_dict.values()))
                     new_matrix[i, j] = chosen_cell_id
 
+    # Update the spatial object with the new cell assignments
     so.pixels_cells = new_matrix
 
     return so
 
 
-def plot_pixels_cells(
+def plot_image_with_overlay(
+    ax,
     image,
     cells,
+    uniques,
     colors=None,
     dpi=1500,
     transparency=0.6,
-    save="combined_image_bin2cell.pdf",
+    transparent_background=False,
 ):
 
-    import matplotlib.colors as mcolors
+    matrix = cells.copy()
+    matrix_mod_1 = np.zeros(cells.shape)
+    matrix_mod_2 = np.zeros(cells.shape)
+    matrix_mod_3 = np.zeros(cells.shape)
 
-    matrix = copy.deepcopy(cells)
-    matrix_mod_1 = copy.deepcopy(matrix)
-    matrix_mod_2 = copy.deepcopy(matrix)
-    matrix_mod_3 = copy.deepcopy(matrix)
+    # Apply modular arithmetic to spread out cell IDs across color channels
+    if colors is None:
+        nums = [9, 5, 7]
+        mask = matrix > 0
+        matrix_mod_1[mask] = (240 / nums[0] * (matrix[mask] % nums[0])) + 1
+        matrix_mod_2[mask] = (240 / nums[1] * (matrix[mask] % nums[1])) + 1
+        matrix_mod_3[mask] = (240 / nums[2] * (matrix[mask] % nums[2])) + 1
+    else:
+        t = 0
+        for i in uniques:
+            if i == 0:
+                continue
+            else:
+                ct = np.array(cells == i)
+                matrix_mod_1[ct] = colors[t][0]
+                matrix_mod_2[ct] = colors[t][1]
+                matrix_mod_3[ct] = colors[t][2]
+                t += 1
 
-    nums = [9, 5, 7]
-    matrix_mod_1[matrix_mod_1 > 0] = (
-        240 / nums[0] * (matrix_mod_1[matrix_mod_1 > 0] % nums[0])
-    ) + 1
-    matrix_mod_2[matrix_mod_2 > 0] = (
-        240 / nums[1] * (matrix_mod_2[matrix_mod_2 > 0] % nums[1])
-    ) + 1
-    matrix_mod_3[matrix_mod_3 > 0] = (
-        240 / nums[2] * (matrix_mod_3[matrix_mod_3 > 0] % nums[2])
-    ) + 1
-
+    # Stack the modified matrices to create an RGB image
     rgb_matrix = np.stack((matrix_mod_1, matrix_mod_2, matrix_mod_3), axis=-1)
+    rgb_matrix = rgb_matrix.astype(np.uint8)
 
-    rgb_matrix = (rgb_matrix).astype(np.uint8)
+    # Stack the modified matrices to create an RGB image
+    rgb_matrix = np.stack((matrix_mod_1, matrix_mod_2, matrix_mod_3), axis=-1)
+    rgb_matrix = rgb_matrix.astype(np.uint8)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    if transparent_background:
+        # Create an alpha channel
+        alpha_channel = (
+            np.ones(cells.shape) * transparency * 255
+        )  # Multiply by 255 for uint8
+        alpha_channel[
+            cells == 0
+        ] = 0  # Set alpha to 0 where cells == 0 (fully transparent)
+    else:
+        # Set RGB values to 255 (white) where cells == 0
+        rgb_matrix[cells == 0] = 255
+        # Create an alpha channel with uniform transparency
+        alpha_channel = (
+            np.ones(cells.shape) * transparency * 255
+        )  # Multiply by 255 for uint8
+
+    # Stack RGB and alpha channels to create an RGBA image
+    rgba_matrix = np.dstack((rgb_matrix, alpha_channel.astype(np.uint8)))
+
+    ax.axis("off")
     ax.imshow(image)
-    ax.imshow(255 - rgb_matrix, interpolation="nearest", alpha=transparency)
+    ax.imshow(rgba_matrix, interpolation="nearest")
+
+
+def plot_colors_with_indices(ax, colors):
+
+    # Plot each color as a rectangle with its index
+    for i, color in enumerate(colors):
+        color_normalized = [x / 255 for x in color]
+        rect = patches.Rectangle(
+            (i, 0), 1, 1, linewidth=1, edgecolor="none", facecolor=color_normalized
+        )
+        ax.add_patch(rect)
+        ax.text(
+            i + 0.5,
+            0.5,
+            str(i + 1),
+            color="white" if sum(color_normalized[:3]) < 1.5 else "black",
+            ha="center",
+            va="center",
+            fontsize=8,
+            fontweight="bold",
+        )
+    ax.set_xlim(0, len(colors))
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+
+def plot_pixels_cells(
+    image,
+    cells,
+    uniques,
+    colors=None,
+    dpi=1500,
+    transparency=0.6,
+    figsize=(20, 20),
+    save=None,
+    transparent_background=False,
+):
+
+    # Prepare matrices for RGB channels
+    matrix = cells.copy()
+    matrix_mod_1 = np.zeros(cells.shape)
+    matrix_mod_2 = np.zeros(cells.shape)
+    matrix_mod_3 = np.zeros(cells.shape)
+
+    if colors is None:
+        nums = [9, 5, 7]
+        mask = matrix > 0
+        matrix_mod_1[mask] = (240 / nums[0] * (matrix[mask] % nums[0])) + 1
+        matrix_mod_2[mask] = (240 / nums[1] * (matrix[mask] % nums[1])) + 1
+        matrix_mod_3[mask] = (240 / nums[2] * (matrix[mask] % nums[2])) + 1
+    else:
+        t = 0
+        if len(uniques) - 1 <= len(colors):
+            for i in uniques:
+                if i == 0:
+                    continue
+                else:
+                    ct = np.array(cells == i)
+                    matrix_mod_1[ct] = colors[t][0]
+                    matrix_mod_2[ct] = colors[t][1]
+                    matrix_mod_3[ct] = colors[t][2]
+                    t += 1
+        else:
+            raise TypeError("Please input colors with enough units.")
+
+    # Stack the modified matrices to create an RGB image
+    rgb_matrix = np.stack((matrix_mod_1, matrix_mod_2, matrix_mod_3), axis=-1)
+    rgb_matrix = rgb_matrix.astype(np.uint8)
+
+    if transparent_background:
+        # Create an alpha channel
+        alpha_channel = (
+            np.ones(cells.shape) * transparency * 255
+        )  # Multiply by 255 for uint8
+        alpha_channel[
+            cells == 0
+        ] = 0  # Set alpha to 0 where cells == 0 (fully transparent)
+    else:
+        # Set RGB values to 255 (white) where cells == 0
+        rgb_matrix[cells == 0] = 255
+        # Create an alpha channel with uniform transparency
+        alpha_channel = (
+            np.ones(cells.shape) * transparency * 255
+        )  # Multiply by 255 for uint8
+
+    # Stack RGB and alpha channels to create an RGBA image
+    rgba_matrix = np.dstack((rgb_matrix, alpha_channel.astype(np.uint8)))
+
+    # Plot the original image with the cell overlay
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(image)
+
+    # Overlay the RGBA image
+    ax.imshow(rgba_matrix, interpolation="nearest")
 
     plt.axis("off")
 
-    if save != False:
+    # Save and display the figure
+    if save not in [False, None]:
         plt.savefig(save, dpi=dpi, bbox_inches="tight", pad_inches=0)
     plt.show()
+    plt.close()
 
 
-def find_plot(so, image_format="he"):
-    if image_format == "he":
-        return so.image[so.row_left : so.row_right, so.col_up : so.col_down, :]
-    elif image_format == "dapi":
-        return so.image[so.row_left : so.row_right, so.col_up : so.col_down]
+def plot_whole(
+    img_np,
+    cell_type_final,
+    uniques,
+    colors,
+    dpi=1000,
+    transparency=0.6,
+    figsize=(20, 20),
+    transparent_background=False,
+    save=None,
+):
+
+    # Create the figure and subplots
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=figsize, gridspec_kw={"height_ratios": [1, 20]}
+    )
+
+    fig.subplots_adjust(hspace=0.05)
+
+    # Plot colors with indices
+    plot_colors_with_indices(ax1, colors)
+
+    # Plot image with overlay
+    plot_image_with_overlay(
+        ax2,
+        img_np,
+        cell_type_final,
+        uniques,
+        colors,
+        dpi,
+        transparency=transparency,
+        transparent_background=transparent_background,
+    )
+
+    # Save the figure
+    if (save != False) and (save is not None):
+        plt.savefig(save, dpi=dpi)
+    plt.show()
+    plt.close()
+
+
+def plot_results(
+    original_image,
+    result_image,
+    transparency=0.6,
+    transparent_background=False,
+    include_label=None,
+    colors=None,
+    dpi=1500,
+    figsize=(20, 20),
+    save=None,
+):
+
+    if transparency <= 0 or transparency > 1:
+        raise TypeError("Please input transparency in (0,1].")
+
+    uniques = np.unique(result_image)
+    number = len(uniques) - 1
+
+    if include_label == True:
+        if number > 50:
+            print("Too many cell labels. include_label will be False")
+            include_label = False
+    elif include_label != False:
+        if number > 50:
+            include_label = False
+        else:
+            include_label = True
+
+    if colors != None:
+        if number > len(colors):
+            print("Unique cell labels larger than len(colors). ")
+            colors = None
+
+    if (colors == None) and (number <= 50):
+        colors = [
+            (172, 106, 88),
+            (203, 205, 199),
+            (135, 36, 197),
+            (138, 76, 124),
+            (208, 67, 111),
+            (195, 190, 120),
+            (53, 137, 24),
+            (218, 161, 52),
+            (212, 229, 95),
+            (214, 154, 126),
+            (201, 147, 47),
+            (96, 35, 35),
+            (38, 116, 230),
+            (69, 170, 54),
+            (223, 96, 36),
+            (197, 213, 195),
+            (29, 101, 119),
+            (186, 109, 121),
+            (127, 202, 188),
+            (76, 216, 34),
+            (108, 190, 202),
+            (75, 64, 110),
+            (109, 76, 90),
+            (141, 92, 60),
+            (74, 84, 82),
+            (45, 166, 110),
+            (93, 149, 201),
+            (100, 68, 27),
+            (167, 158, 108),
+            (157, 151, 133),
+            (24, 52, 56),
+            (47, 51, 169),
+            (123, 113, 91),
+            (103, 162, 189),
+            (176, 28, 225),
+            (129, 49, 52),
+            (114, 103, 104),
+            (69, 118, 27),
+            (25, 104, 216),
+            (71, 117, 103),
+            (200, 110, 26),
+            (143, 48, 142),
+            (163, 211, 182),
+            (140, 149, 222),
+            (223, 68, 30),
+            (208, 155, 75),
+            (132, 190, 119),
+            (223, 67, 163),
+            (170, 181, 219),
+            (145, 220, 27),
+        ]
+
+    if include_label == False:
+        plot_pixels_cells(
+            original_image,
+            result_image,
+            uniques,
+            colors=colors,
+            dpi=dpi,
+            figsize=figsize,
+            transparency=transparency,
+            transparent_background=transparent_background,
+            save=save,
+        )
+    else:
+        plot_whole(
+            original_image,
+            result_image,
+            uniques,
+            colors=colors,
+            dpi=dpi,
+            figsize=figsize,
+            transparency=transparency,
+            transparent_background=transparent_background,
+            save=save,
+        )

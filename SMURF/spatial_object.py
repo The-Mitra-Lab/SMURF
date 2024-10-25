@@ -8,6 +8,7 @@ import tqdm
 
 def to_dict(d):
 
+    # Recursively convert defaultdicts to regular dictionaries
     if isinstance(d, defaultdict):
         return {key: to_dict(value) for key, value in d.items()}
     return d
@@ -15,6 +16,7 @@ def to_dict(d):
 
 def cells(segmentation_final, pixels):
 
+    # Create a dictionary mapping cell labels to pixel values and their counts
     cells = defaultdict(lambda: defaultdict(int))
     for i in tqdm.tqdm(range(segmentation_final.shape[0])):
         for j in range(segmentation_final.shape[1]):
@@ -28,6 +30,7 @@ def cells(segmentation_final, pixels):
 
 def spots(segmentation_final, pixels, df):
 
+    # Create a dictionary mapping spot IDs to cell labels and their counts
     spots = defaultdict(lambda: defaultdict(int))
 
     for i in tqdm.tqdm(range(pixels.shape[0])):
@@ -37,6 +40,7 @@ def spots(segmentation_final, pixels, df):
                 label = segmentation_final[i, j]
                 spots[pixel_value][label] += 1
 
+    # Ensure that all spots in tissue are included, even if they have no labels
     for spot_id in list(df[df.in_tissue == 1].index):
         if spot_id not in spots.keys():
             spots[spot_id] = {0: 1}
@@ -46,6 +50,7 @@ def spots(segmentation_final, pixels, df):
 
 def create_cells_main(cells, spots, cells_main_pct, max_spot):
 
+    # Identify main spots for each cell based on a percentage threshold
     cells_main = {}
     for cell in list(cells.keys()):
         cells_main[cell] = []
@@ -54,6 +59,7 @@ def create_cells_main(cells, spots, cells_main_pct, max_spot):
                 if cells[cell][spot] > cells_main_pct * sum(spots[spot].values()):
                     cells_main[cell].append(spot)
 
+        # Remove cells that don't meet criteria
         if cells_main[cell] == [] or len(cells_main[cell]) > max_spot:
             del cells_main[cell]
 
@@ -64,6 +70,7 @@ def knn(
     spots_result, cell_ids, cells_main, start_row_spot, start_col_spot, index_toset
 ):
 
+    # Compute the k-nearest neighbors for cell centers
     cell_coords_dict = {}
 
     for ids in range(len(cell_ids)):
@@ -74,6 +81,7 @@ def knn(
             spots_result[i - start_row_spot, j - start_col_spot] = cell_id
             cell_coords_dict[cell_id].append((i, j))
 
+    # Calculate cell centers as the mean of their coordinates
     cell_centers = {}
     for cell_id, coords in cell_coords_dict.items():
         coords_array = np.array(coords)
@@ -82,6 +90,7 @@ def knn(
 
     center_coords = np.array(list(cell_centers.values()))
 
+    # Use NearestNeighbors to compute distances and indices
     from sklearn.neighbors import NearestNeighbors
 
     nn_model = NearestNeighbors(n_neighbors=4, algorithm="auto", metric="euclidean")
@@ -94,9 +103,11 @@ def knn(
 
 def add_segmentation_temp(segmentation_results, i_max, j_max, loop, gap):
 
+    # Combine segmentation results from different blocks into a final segmentation map
     segmentation_results1 = copy.deepcopy(segmentation_results)
-
     num = 0
+
+    # Adjust labels to ensure uniqueness across blocks
     for i in range(0, i_max, loop):
         for j in range(0, j_max, loop):
             segmentation_results1[(i, j)][segmentation_results1[(i, j)] != 0] = (
@@ -106,6 +117,7 @@ def add_segmentation_temp(segmentation_results, i_max, j_max, loop, gap):
 
     segmentation_final = np.zeros((i_max, j_max))
 
+    # Merge the blocks into the final segmentation map
     for i in range(0, i_max, loop):
         for j in range(0, j_max, loop):
             if i == 0 and j == 0:
@@ -127,6 +139,7 @@ def add_segmentation_temp(segmentation_results, i_max, j_max, loop, gap):
 
     t = 0
 
+    # Resolve overlaps between blocks
     for i in range(0, i_max, loop):
         for j in range(0, j_max, loop):
             if j != 0:
@@ -228,11 +241,14 @@ class spatial_object:
         col_up,
         col_down,
         pixels,
+        image_format,
     ):
 
+        # Initialize the spatial object with image data and relevant parameters
         self.image = image
         self.df = df
         self.df_temp = df_temp
+        self.image_format = image_format
 
         self.start_row_spot = start_row_spot
         self.end_row_spot = end_row_spot
@@ -256,21 +272,33 @@ class spatial_object:
         self.indices = None
         self.spots_result = None
         self.cell_centers = None
+        self.pixels_cells = None
+        self.final_nuclei = None
 
     def image_temp(self):
 
-        return self.image[
-            self.row_left : self.row_right, self.col_up : self.col_down, :
-        ]
+        # Return the cropped image based on the specified boundaries
+        if self.image_format == "HE":
+            return self.image[
+                self.row_left : self.row_right, self.col_up : self.col_down, :
+            ]
+        elif self.image_format == "DAPI":
+            return self.image[
+                self.row_left : self.row_right, self.col_up : self.col_down
+            ]
+        else:
+            print("Please input 'HE' or 'DAPI'.")
 
     def add_segmentation(self, segmentation_results, i_max, j_max, loop, gap):
 
+        # Add segmentation results to the spatial object
         self.segmentation_final = add_segmentation_temp(
             segmentation_results, i_max, j_max, loop, gap
         )
 
     def generate_cell_spots_information(self, max_spot=50, cells_main_pct=float(1 / 6)):
 
+        # Generate cells and spots information, and create a nearest neighbor network
         print("Generating cells information.")
         self.cells = cells(self.segmentation_final, self.pixels)
 
@@ -282,13 +310,14 @@ class spatial_object:
         for i, inner_dic in self.spots.items():
             max_len = max(max_len, len(inner_dic))
 
-        print(f"The large number of nucleis per spot is {max_len}.")
+        # print(f"The largest number of nucleis per spot is {max_len}.")
 
         print("Filtering cells")
 
         self.cells_main = create_cells_main(
             self.cells, self.spots, cells_main_pct, max_spot
         )
+        print(f"We have {len(self.cells_main)} nuclei in total.")
 
         print("Creating NN network")
 
