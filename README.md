@@ -28,9 +28,9 @@ We rely on external packages for nuclei segmentation and create an so (spatial o
 
 ### PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
 
-[link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
+[Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
-[![Download Tutorial](https://img.shields.io/badge/Download-Tutorial_cell_segmentation.ipynb-brightgreen)](https://raw.githubusercontent.com/The-Mitra-Lab/SMURF/main/test/Tutorial_cell_segmentation.ipynb)
+[Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
 ### Simple version.
 
