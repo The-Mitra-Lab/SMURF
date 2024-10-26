@@ -314,7 +314,7 @@ def singlecellanalysis(
     save=False,
     i=None,
     path=None,
-    resolution=1,
+    resolution=2,
     regress_out=True,
     random_state=0,
     show=True,
@@ -651,10 +651,10 @@ def return_celltype_plot(adata_sc, so, cluster_name="leiden"):
     return cell_type_final
 
 
-def plot_celltype_position(cell_type_final, col_num=5):
+def plot_cellcluster_position(cell_cluster_final, col_num=5):
 
     # Determine the maximum cell type value
-    max_type = int(np.max(cell_type_final))
+    max_type = int(np.max(cell_cluster_final))
 
     # Calculate total number of plots and the number of rows needed
     total_plots = max_type + 1
@@ -670,19 +670,21 @@ def plot_celltype_position(cell_type_final, col_num=5):
 
     # Plot the overall distribution of all cell types
     ax = axs[0, 0]
-    im = ax.imshow(cell_type_final, cmap=cmap, vmin=1, vmax=max_type)
+    im = ax.imshow(cell_cluster_final, cmap=cmap, vmin=1, vmax=max_type)
     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Cell Type")
+    cbar.set_label("Cell Cluster")
     cbar.set_ticks(np.arange(1, max_type + 1))
-    ax.set_title("Distribution of All Cell Types", size=14)
+    ax.set_title("Distribution of All Cell Clusters", size=14)
     ax.axis("off")
 
     # Plot individual cell types
     for i in range(1, max_type + 1):
         ax = axs[(i) // col_num, (i) % col_num]
-        ax.imshow(np.squeeze(np.array(cell_type_final == i)), cmap=cmap, vmin=0, vmax=1)
+        ax.imshow(
+            np.squeeze(np.array(cell_cluster_final == i)), cmap=cmap, vmin=0, vmax=1
+        )
         ax.axis("off")
-        ax.set_title("Cell type " + str(i), size=14)
+        ax.set_title("Cell cluster " + str(i - 1), size=14)
 
     # Turn off any unused subplots
     for i in range(total_plots, rows * col_num):
@@ -699,7 +701,7 @@ def itering_arragement(
     adata_raw,
     adata,
     so,
-    resolution=1,
+    resolution=2,
     regress_out=True,
     save_folder="results_example/",
     show=True,
@@ -1241,7 +1243,7 @@ def plot_results(
             (223, 67, 163),
             (170, 181, 219),
             (145, 220, 27),
-        ]
+        ][:number]
 
     if include_label == False:
         plot_pixels_cells(

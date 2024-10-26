@@ -6,7 +6,7 @@ from .__helper__ import (
     itering_arragement,
     make_pixels_cells,
     nuclei_rna,
-    plot_celltype_position,
+    plot_cellcluster_position,
     plot_results,
     prepare_dataframe_image,
     return_celltype_plot,
@@ -21,4 +21,4 @@ from .split import (
     make_preparation,
 )
 
-__version__ = "0.0.3"
+__version__ = "1.0.0"

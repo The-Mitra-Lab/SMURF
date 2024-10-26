@@ -706,7 +706,7 @@ def get_finaldata(
             X=final_X.tocsr(),
             obs=pd.DataFrame(
                 cell_info,
-                columns=["cell_type", "cos_simularity", "cell_size"],
+                columns=["cell_cluster", "cos_simularity", "cell_size"],
                 index=cell_index,
             ),
             var=adata.var,
@@ -738,7 +738,7 @@ def get_finaldata(
             X=final_X.tocsr(),
             obs=pd.DataFrame(
                 cell_info,
-                columns=["cell_type", "cos_simularity", "cell_size", "x", "y"],
+                columns=["cell_cluster", "cos_simularity", "cell_size", "x", "y"],
                 index=cell_index,
             ),
             var=adata.var,
@@ -1089,7 +1089,7 @@ def get_finaldata_fast(
         X=final_X.tocsr(),
         obs=pd.DataFrame(
             cell_info,
-            columns=["cell_type", "cos_simularity", "cell_size", "x", "y"],
+            columns=["cell_cluster", "cos_simularity", "cell_size", "x", "y"],
             index=cell_index,
         ),
         var=adata.var,

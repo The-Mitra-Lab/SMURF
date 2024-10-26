@@ -16,7 +16,7 @@ pip install git+https://github.com/The-Mitra-Lab/SMURF.git
 
 To install the advanced version of SpatialCell, run the following command:
 ```bash
-pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[advanced]"
+pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 ```
 
 
@@ -59,6 +59,10 @@ Here are some tips for using `so`.
 
 - **`So.final_nuclei`**
   - Stores the nuclei * genes `adata` matrix.
+
+## `SO` Greate Results:
+
+
 
 ##  `SO` Beautiful Visualization:
 
