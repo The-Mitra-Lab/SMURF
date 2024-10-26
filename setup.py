@@ -1,11 +1,21 @@
+import pathlib
+
 from setuptools import find_packages, setup
 
+# Get the current directory
+HERE = pathlib.Path(__file__).parent
+
+# Read the README file
+README = (HERE / "README.md").read_text()
+
 setup(
-    name="SMURF",
+    name="smurf",
     version="1.0.0",
     author="Juanru Guo",
     author_email="g.juanru@wustl.edu",
     description="Segmentation and Manifold UnRolling Framework (SMURF)",
+    long_description=README,
+    long_description_content_type="text/markdown",
     packages=find_packages(),
     install_requires=[
         "numpy >= 1.26.4",
@@ -18,6 +28,7 @@ setup(
         "scikit-learn >= 1.4.1",
         "Pillow >= 10.2.0",
         "anndata >= 0.10.6",
+        "h5py >= 3.10.0" "pickle",
     ],
     extras_require={"full": ["torch  >= 2.2.1", "py3nvml >= 0.2.7"]},
     python_requires=">=3.8",
