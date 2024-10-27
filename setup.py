@@ -29,6 +29,8 @@ setup(
         "Pillow >= 10.2.0",
         "anndata >= 0.10.6",
         "h5py >= 3.10.0",
+        "pyarrow >= 16.1.0",
+        "igraph >= 0.11.5",
     ],
     extras_require={"full": ["torch  >= 2.2.1", "py3nvml >= 0.2.7"]},
     python_requires=">=3.8",
