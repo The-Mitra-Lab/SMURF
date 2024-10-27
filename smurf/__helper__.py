@@ -787,14 +787,9 @@ def itering_arragement(
         mi = normalized_mutual_info_score(
             adata_type_record[i], adata_type_record[i - 1]
         )
-        adata_temp.write(save_folder + "adatas_" + str(i) + ".h5ad")
         mis.append(mi)
-
-        # Save progress
         with open(save_folder + "mis.pkl", "wb") as f:
             pickle.dump(mis, f)
-        with open(save_folder + "cells_final_" + str(i) + ".pkl", "wb") as f:
-            pickle.dump(cells_final, f)
 
         if show:
             print(mi, i)
@@ -832,6 +827,10 @@ def itering_arragement(
             # Update weights if mutual information increases
             if max_mi < mi:
                 max_mi = mi
+
+                adata_temp.write(save_folder + "adatas_" + str(i) + ".h5ad")
+                with open(save_folder + "cells_final_" + str(i) + ".pkl", "wb") as f:
+                    pickle.dump(cells_final, f)
 
                 if keep_previous != True:
                     # Remove older files
