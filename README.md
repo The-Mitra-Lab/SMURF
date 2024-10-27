@@ -8,13 +8,19 @@ You can install SMURF directly from its GitHub repository. Here’s how you can 
 
 ## Standard Installation
 
-To install the latest version of SMURF, run the following command:
+It is recommended to create a Conda environment, especially for users who want to use the full version:
 
+```bash
+conda create -n smurf python=3.10
+conda activate smurf
+```
+
+To install the lite version of smurf, run the following command:
 ```bash
 pip install git+https://github.com/The-Mitra-Lab/SMURF.git
 ```
 
-To install the advanced version of SpatialCell, run the following command:
+To install the full version of smurf, run the following command:
 ```bash
 pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 ```
