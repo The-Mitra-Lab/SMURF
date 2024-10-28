@@ -73,12 +73,12 @@ Here are some tips for using `so`.
 ## `SO` Greate Results:
 
 - **`adata_sc_final`**
-  - obs:
+  - `obs`:
     - `cell_cluster`: Denotes the cluster assignment from the iteration.
     - `cos_simularity`: The cosine similarity of the cell's gene expression with the average expression of its cluster.
     - `cell_size`: The number of `2um` spots occupied by this cell.
     - `x` and `y`: The absolute coordinates of the cell, matching the spot locations provided by 10x.
-  - var:
+  - `var`:
     - The same as 10x provide for spots*genes array.
 
 
@@ -136,15 +136,17 @@ This function allows you to plot results with the same format as So.segmentation
 
 ```python
 import smurf as su
-su.su.plot_results(so.image_temp(), so.pixels_cells)
+su.plot_results(so.image_temp(), so.pixels_cells)
 ```
 
 # Citation
 
+Paper on the way...
+
 ```latex
 
 @misc{smurf,
-  author = {Juanru Guo and Mitra Lab},
+  author = {Juanru Guo and The Mitra Lab},
   title = {SMURF: Segmentation and Manifold UnRolling Framework},
   year = {2024},
   publisher = {GitHub},
