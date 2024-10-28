@@ -13,7 +13,7 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage s
 - [Installation ](#installation-)
   - [Create conda ](#create-conda-)
   - [Lite version ](#lite-version-)
-  - [Full version ](#full-version-)
+  - [Full version (GPU needed)](#full-version-gpu-needed)
 - [Tutorial ](#tutorial-)
   - [PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method). ](#pre-nuclei-segmentation-skip-if-you-had-your-perferred-nuclei-segmentation-method-)
   - [Lite version. ](#lite-version--1)
@@ -48,7 +48,7 @@ To install the lite version of smurf, run the following command:
 pip install git+https://github.com/The-Mitra-Lab/SMURF.git
 ```
 
-## Full version <a name="Full"></a>
+## Full version (GPU needed)<a name="Full"></a>
 
 To install the full version of smurf, run the following command:
 ```bash
