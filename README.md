@@ -2,11 +2,23 @@
 
 Welcome to the SMURF repository!
 
-# Installation
+
+## Contents
+[Installation](#installation)
+  [Create conda](#Createconda)
+  [Lite version](#Lite)
+  [Full version](#Full)
+[Tutorial](#Tutorial)
+[Introduction for fmportant functions and object](#Introduction)
+[Citation](#Citation)
+
+
+
+# Installation <a name="installation"></a>
 
 You can install SMURF directly from its GitHub repository. Here’s how you can do it:
 
-## Standard Installation
+## Create conda <a name="Createconda"></a>
 
 It is recommended to create a Conda environment, especially for users who want to use the full version:
 
@@ -15,10 +27,14 @@ conda create -n smurf python=3.10
 conda activate smurf
 ```
 
+## Lite version <a name="Lite"></a>
+
 To install the lite version of smurf, run the following command:
 ```bash
 pip install git+https://github.com/The-Mitra-Lab/SMURF.git
 ```
+
+## Full version <a name="Full"></a>
 
 To install the full version of smurf, run the following command:
 ```bash
@@ -26,7 +42,7 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 ```
 
 
-# Tutorial
+# Tutorial <a name="Tutorial"></a>
 
 We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
 
@@ -52,7 +68,7 @@ We rely on external packages for nuclei segmentation and create an so (spatial o
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
 
 
-# Introduction for fmportant functions and object.
+# Introduction for fmportant functions and object.  <a name="Introduction"></a>
 
 Here are some tips for using `so`.
 
@@ -139,7 +155,7 @@ import smurf as su
 su.plot_results(so.image_temp(), so.pixels_cells)
 ```
 
-# Citation
+# Citation  <a name="Citation"></a>
 
 Paper on the way...
 
