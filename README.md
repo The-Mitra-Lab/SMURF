@@ -4,19 +4,19 @@ Welcome to the SMURF repository!
 
 
 ## Contents
-  [Installation](#installation)
 
-    [Create conda](#Createconda)
 
-    [Lite version](#Lite)
+- [Installation](#installation)
 
-    [Full version](#Full)
+  - [Create conda](#Createconda)
+  - [Lite version](#Lite)
+  - [Full version](#Full)
 
-  [Tutorial](#Tutorial)
+- [Tutorial](#Tutorial)
 
-  [Introduction for fmportant functions and object](#Introduction)
+- [Introduction for fmportant functions and object](#Introduction)
 
-  [Citation](#Citation)
+- [Citation](#Citation)
 
 
 
