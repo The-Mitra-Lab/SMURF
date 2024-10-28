@@ -6,17 +6,23 @@ Welcome to the SMURF repository!
 ## Contents
 
 
-- [Installation](#installation)
-
-  - [Create conda](#Createconda)
-  - [Lite version](#Lite)
-  - [Full version](#Full)
-
-- [Tutorial](#Tutorial)
-
-- [Introduction for fmportant functions and object](#Introduction)
-
-- [Citation](#Citation)
+- [Segmentation and Manifold UnRolling Framework (SMURF)](#segmentation-and-manifold-unrolling-framework-smurf)
+  - [Contents](#contents)
+- [Installation ](#installation-)
+  - [Create conda ](#create-conda-)
+  - [Lite version ](#lite-version-)
+  - [Full version ](#full-version-)
+- [Tutorial ](#tutorial-)
+  - [PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method). ](#pre-nuclei-segmentation-skip-if-you-had-your-perferred-nuclei-segmentation-method-)
+  - [Lite version. ](#lite-version--1)
+  - [Full version (GPU needed). ](#full-version-gpu-needed-)
+- [Introduction for fmportant functions and object.  ](#introduction-for-fmportant-functions-and-object--)
+  - [`SO` Important Features:](#so-important-features)
+  - [`SO` Greate Results:](#so-greate-results)
+  - [`SO` Beautiful Visualization:](#so-beautiful-visualization)
+    - [1. `plot_cellcluster_position(cell_cluster_final, col_num=5)`](#1-plot_cellcluster_positioncell_cluster_final-col_num5)
+    - [2. `plot_results(original_image, result_image, transparency=0.6, transparent_background=False, include_label=None, colors=None, dpi=1500, figsize=(20, 20), save=None)`](#2-plot_resultsoriginal_image-result_image-transparency06-transparent_backgroundfalse-include_labelnone-colorsnone-dpi1500-figsize20-20-savenone)
+- [Citation  ](#citation--)
 
 
 
@@ -54,20 +60,20 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage s
 
 We rely on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
 
-## PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
+## PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method). <a name="pre"></a>
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
-## Lite version.
+## Lite version. <a name="lv"></a>
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian.ipynb)
 
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian.ipynb)
 
 
-## Full version (GPU needed).
+## Full version (GPU needed). <a name="fv"></a>
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
 
