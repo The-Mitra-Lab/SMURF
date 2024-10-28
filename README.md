@@ -2,6 +2,8 @@
 
 Welcome to the SMURF repository!
 
+We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
+
 
 ## Contents
 
@@ -56,9 +58,7 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 
 # Tutorial <a name="Tutorial"></a>
 
-We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
-
-We rely on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
+SMURF relies on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
 
 ## PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method). <a name="pre"></a>
 
