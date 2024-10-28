@@ -2,7 +2,7 @@
 
 Welcome to the SMURF repository!
 
-We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
+We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with [VisiumHD data](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression), facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
 
 
 ## Contents
