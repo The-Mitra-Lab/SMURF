@@ -22,8 +22,8 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage s
   - [`SO` Important Features:](#so-important-features)
   - [`SO` Greate Results:](#so-greate-results)
   - [`SO` Beautiful Visualization:](#so-beautiful-visualization)
-    - [1. `plot_cellcluster_position(cell_cluster_final, col_num=5)`](#1-plot_cellcluster_positioncell_cluster_final-col_num5)
-    - [2. `plot_results(original_image, result_image, transparency=0.6, transparent_background=False, include_label=None, colors=None, dpi=1500, figsize=(20, 20), save=None)`](#2-plot_resultsoriginal_image-result_image-transparency06-transparent_backgroundfalse-include_labelnone-colorsnone-dpi1500-figsize20-20-savenone)
+    - [1. `plot_cellcluster_position`](#1-plot_cellcluster_position)
+    - [2. `plot_results`](#2-plot_results)
 - [Citation  ](#citation--)
 
 
@@ -113,7 +113,9 @@ Here are some tips for using `so`.
 ##  `SO` Beautiful Visualization:
 
 
-### 1. `plot_cellcluster_position(cell_cluster_final, col_num=5)`
+### 1. `plot_cellcluster_position`
+
+`plot_cellcluster_position(cell_cluster_final, col_num=5)`
 
 This function is often used after `return_celltype_plot` as:
 
@@ -127,7 +129,9 @@ su.plot_cellcluster_position(cell_cluster_final, col_num=5)
 
 It plots the probability of each cell cluster. The first plot will contain all clusters, followed by one plot per cluster.
 
-### 2. `plot_results(original_image, result_image, transparency=0.6, transparent_background=False, include_label=None, colors=None, dpi=1500, figsize=(20, 20), save=None)`
+### 2. `plot_results`
+
+`plot_results(original_image, result_image, transparency=0.6, transparent_background=False, include_label=None, colors=None, dpi=1500, figsize=(20, 20), save=None)`
 
 This function allows you to plot results with the same format as So.segmentation_final mapped onto so.image_temp().
 
