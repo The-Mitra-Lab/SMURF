@@ -30,7 +30,7 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 
 We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with VisiumHD data, facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
 
-We rely on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example
+We rely on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
 
 ## PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method).
 
@@ -38,7 +38,7 @@ We rely on external packages for nuclei segmentation and create an so (spatial o
 
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
-## Simple version.
+## Lite version.
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian.ipynb)
 
@@ -46,6 +46,10 @@ We rely on external packages for nuclei segmentation and create an so (spatial o
 
 
 ## Full version (GPU needed).
+
+[Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
+
+[Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
 
 
 # Introduction for fmportant functions and object.
@@ -68,6 +72,14 @@ Here are some tips for using `so`.
 
 ## `SO` Greate Results:
 
+- **`adata_sc_final`**
+  - obs:
+    - `cell_cluster`: Denotes the cluster assignment from the iteration.
+    - `cos_simularity`: The cosine similarity of the cell's gene expression with the average expression of its cluster.
+    - `cell_size`: The number of `2um` spots occupied by this cell.
+    - `x` and `y`: The absolute coordinates of the cell, matching the spot locations provided by 10x.
+  - var:
+    - The same as 10x provide for spots*genes array.
 
 
 ##  `SO` Beautiful Visualization:
@@ -125,4 +137,19 @@ This function allows you to plot results with the same format as So.segmentation
 ```python
 import smurf as su
 su.su.plot_results(so.image_temp(), so.pixels_cells)
+```
+
+# Citation
+
+```latex
+
+@misc{smurf,
+  author = {Juanru Guo and Mitra Lab},
+  title = {SMURF: Segmentation and Manifold UnRolling Framework},
+  year = {2024},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/The-Mitra-Lab/SMURF}},
+}
+
 ```
