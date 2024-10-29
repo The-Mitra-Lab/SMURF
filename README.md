@@ -2,7 +2,7 @@
 
 Welcome to the SMURF repository!
 
-We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage soft segmentation with [VisiumHD data](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression), facilitating the creation of a cells*genes `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation.
+We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform soft segmentation of [VisiumHD data](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression), facilitating the creation of a cells*genes anndata object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation and then assigns the transcripts recovered from each capture ‘spot’ to a nearby cell. See  future paper (put biorxiv link here) for further details.”
 
 
 ## Contents
@@ -15,10 +15,10 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage s
   - [Lite version ](#lite-version-)
   - [Full version (GPU needed)](#full-version-gpu-needed)
 - [Tutorial ](#tutorial-)
-  - [PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method). ](#pre-nuclei-segmentation-skip-if-you-had-your-perferred-nuclei-segmentation-method-)
+  - [Preprocessing: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). ](#preprocessing-nuclei-segmentation-skip-this-section-if-you-have-already-segmented-your-data-with-your-preferred-segmentation-method-)
   - [Lite version. ](#lite-version--1)
   - [Full version (GPU needed). ](#full-version-gpu-needed-)
-- [Introduction for fmportant functions and object.  ](#introduction-for-fmportant-functions-and-object--)
+- [Introduction for important functions and object.  ](#introduction-for-important-functions-and-object--)
   - [`SO` Important Features:](#so-important-features)
   - [`SO` Greate Results:](#so-greate-results)
   - [`SO` Beautiful Visualization:](#so-beautiful-visualization)
@@ -27,14 +27,13 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to leverage s
 - [Citation  ](#citation--)
 
 
-
 # Installation <a name="installation"></a>
 
 You can install SMURF directly from its GitHub repository. Here’s how you can do it:
 
 ## Create conda <a name="Createconda"></a>
 
-It is recommended to create a Conda environment, especially for users who want to use the full version:
+It is recommended you create a Conda environment, especially if you want to use the full version of SMURF (as opposed to the “lite” version).
 
 ```bash
 conda create -n smurf python=3.10
@@ -58,9 +57,9 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 
 # Tutorial <a name="Tutorial"></a>
 
-SMURF relies on external packages for nuclei segmentation and create an so (spatial object) for further analysis. Researchers are encouraged to use their preferred segmentation methods. But if you are new to it. Please take [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html) as a trial. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
+SMURF relies on external packages for nuclei segmentation to create a so (a spatial object datastructure) for further analysis. Researchers are encouraged to use their own preferred segmentation methods. For this tutorial, we use [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html), which works well for many datasets. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
 
-## PRE: Nuclei segmentation (skip if you had your perferred nuclei segmentation method). <a name="pre"></a>
+## Preprocessing: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). <a name="pre"></a>
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
@@ -80,9 +79,9 @@ SMURF relies on external packages for nuclei segmentation and create an so (spat
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
 
 
-# Introduction for fmportant functions and object.  <a name="Introduction"></a>
+# Introduction for important functions and object.  <a name="Introduction"></a>
 
-Here are some tips for using `so`.
+Here are some tips for using `so` so (a spatial object datastructure).
 
 ## `SO` Important Features:
 
