@@ -483,9 +483,18 @@ def make_preparation(
     )
 
 
-def calculate_distances(A, C):
+def calculate_radius(area):
+    if area < 0:
+        raise ValueError("Area cannot be negative")
+    return math.sqrt(area / math.pi)
+
+
+def calculate_distances(A, C, size):
     AC = math.sqrt((C[0] - A[0]) ** 2 + (C[1] - A[1]) ** 2)
-    return 1 / (AC + 1e-8)
+    if size > 0:
+        return calculate_radius(size) / (AC + 1e-10)
+    else:
+        return 1e-10 / (AC + 1e-10)
 
 
 def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
@@ -973,20 +982,6 @@ def get_finaldata_fast(
     rows = list(so.df[so.df.in_tissue == 1].array_row)
     cols = list(so.df[so.df.in_tissue == 1].array_col)
 
-    ratios = []
-    for i in range(len(to_ml)):
-        new = []
-        for j in range(len(to_ml[i][1])):
-            new.append(
-                calculate_distances(
-                    (rows[to_ml[i][0]], cols[to_ml[i][0]]),
-                    so.cell_centers[to_ml[i][1][j]],
-                )
-            )
-        new = np.array(new)
-        new = new / new.sum()
-        ratios.append(new)
-
     cells_x = {}
     for cell_id in cells_before_ml.keys():
         cells_x[cell_id] = np.zeros([data_temp.shape[1]])
@@ -1017,6 +1012,21 @@ def get_finaldata_fast(
                 )
                 cells_x[cell_id] = cells_x[cell_id] + X
                 binnumbers[cell_id] = binnumbers[cell_id] + i[1]
+
+    ratios = []
+    for i in range(len(to_ml)):
+        new = []
+        for j in range(len(to_ml[i][1])):
+            new.append(
+                calculate_distances(
+                    (rows[to_ml[i][0]], cols[to_ml[i][0]]),
+                    so.cell_centers[to_ml[i][1][j]],
+                    binnumbers[to_ml[i][1][j]],
+                )
+            )
+        new = np.array(new)
+        new = new / new.sum()
+        ratios.append(new)
 
     np.random.seed(0)
     for i in range(len(to_ml)):
