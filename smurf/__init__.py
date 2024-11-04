@@ -20,5 +20,16 @@ from .split import (
     get_finaldata_fast,
     make_preparation,
 )
+from .unroll import (
+    clean_select,
+    plot_final_result,
+    plot_selected,
+    select_cells,
+    select_rest_cells,
+    x_axis,
+    x_axis_pre,
+    y_axis,
+    y_axis_circle,
+)
 
 __version__ = "1.0.0"
