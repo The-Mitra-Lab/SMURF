@@ -15,9 +15,9 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform so
   - [Lite version ](#lite-version-)
   - [Full version (GPU needed)](#full-version-gpu-needed)
 - [Tutorial ](#tutorial-)
-  - [Preprocessing: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). ](#preprocessing-nuclei-segmentation-skip-this-section-if-you-have-already-segmented-your-data-with-your-preferred-segmentation-method-)
   - [Lite version. ](#lite-version--1)
   - [Full version (GPU needed). ](#full-version-gpu-needed-)
+  - [External reference: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). ](#external-reference-nuclei-segmentation-skip-this-section-if-you-have-already-segmented-your-data-with-your-preferred-segmentation-method-)
 - [Introduction for important functions and object.  ](#introduction-for-important-functions-and-object--)
   - [`SO` Important Features:](#so-important-features)
   - [`SO` Greate Results:](#so-greate-results)
@@ -59,12 +59,6 @@ pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
 
 SMURF relies on external packages for nuclei segmentation to create a so (a spatial object datastructure) for further analysis. Researchers are encouraged to use their own preferred segmentation methods. For this tutorial, we use [StarDist](https://qupath.readthedocs.io/en/0.3/docs/advanced/stardist.html), which works well for many datasets. Here we use [mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) data from 10x as example:
 
-## Preprocessing: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). <a name="pre"></a>
-
-[Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
-
-[Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
-
 ## Lite version. <a name="lv"></a>
 
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian.ipynb)
@@ -77,6 +71,12 @@ SMURF relies on external packages for nuclei segmentation to create a so (a spat
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
 
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_Mousebrian_full.ipynb)
+
+## External reference: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). <a name="pre"></a>
+
+[Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
+
+[Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
 
 # Introduction for important functions and object.  <a name="Introduction"></a>
