@@ -43,16 +43,20 @@ conda activate smurf
 ## Lite version <a name="Lite"></a>
 
 To install the lite version of smurf, run the following command:
+
 ```bash
-pip install git+https://github.com/The-Mitra-Lab/SMURF.git
+pip install pysmurf
 ```
 
 ## Full version (GPU needed)<a name="Full"></a>
 
 To install the full version of smurf, run the following command:
+
 ```bash
-pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=SMURF[full]"
+pip install "pysmurf[full]"
 ```
+
+The only difference between the full version and the lite version is that the full version ensures that the required version of PyTorch (and related packages) are correctly installed.
 
 
 # Tutorial <a name="Tutorial"></a>

@@ -9,7 +9,7 @@ HERE = pathlib.Path(__file__).parent
 README = (HERE / "README.md").read_text()
 
 setup(
-    name="smurf",
+    name="pysmurf",
     version="1.0.0",
     author="Juanru Guo",
     author_email="g.juanru@wustl.edu",
