@@ -227,6 +227,66 @@ def add_segmentation_temp(segmentation_results, i_max, j_max, loop, gap):
 
 
 class spatial_object:
+
+    """
+    A class to represent and manage spatial data, including images, spot information, and cell segmentation.
+
+    This class encapsulates spatial data and provides methods to manipulate and analyze the data,
+    such as cropping images, adding segmentation results, and generating cell and spot information.
+
+    :param image:
+        The full-resolution tissue image as a NumPy array.
+    :type image: numpy.ndarray
+
+    :param df:
+        A pandas DataFrame containing spot position data.
+    :type df: pandas.DataFrame
+
+    :param df_temp:
+        A temporary pandas DataFrame with spot data within specified ranges.
+    :type df_temp: pandas.DataFrame
+
+    :param start_row_spot:
+        The starting index of the row for spots in tissue.
+    :type start_row_spot: int
+
+    :param end_row_spot:
+        The ending index of the row for spots in tissue.
+    :type end_row_spot: int
+
+    :param start_col_spot:
+        The starting index of the column for spots in tissue.
+    :type start_col_spot: int
+
+    :param end_col_spot:
+        The ending index of the column for spots in tissue.
+    :type end_col_spot: int
+
+    :param row_left:
+        The left boundary (row index) for cropping the image.
+    :type row_left: int
+
+    :param row_right:
+        The right boundary (row index) for cropping the image.
+    :type row_right: int
+
+    :param col_up:
+        The upper boundary (column index) for cropping the image.
+    :type col_up: int
+
+    :param col_down:
+        The lower boundary (column index) for cropping the image.
+    :type col_down: int
+
+    :param pixels:
+        A NumPy array representing pixel assignments, initialized with -1.
+    :type pixels: numpy.ndarray
+
+    :param image_format:
+        The format of the image, either 'HE' or 'DAPI'.
+    :type image_format: str
+    """
+
     def __init__(
         self,
         image,
@@ -277,6 +337,18 @@ class spatial_object:
 
     def image_temp(self):
 
+        """
+        Returns the cropped image based on the specified boundaries.
+
+        :return:
+            The cropped image as a NumPy array. If `image_format` is 'HE', the image is returned with all color channels.
+            If `image_format` is 'DAPI', the image is returned as a single channel.
+        :rtype: numpy.ndarray
+
+        :raises ValueError:
+            If `image_format` is not 'HE' or 'DAPI'.
+        """
+
         # Return the cropped image based on the specified boundaries
         if self.image_format == "HE":
             return self.image[
@@ -291,12 +363,60 @@ class spatial_object:
 
     def add_segmentation(self, segmentation_results, i_max, j_max, loop, gap):
 
+        """
+        Adds segmentation results to the spatial object.
+
+        :param segmentation_results:
+            The segmentation results to be added.
+        :type segmentation_results: any (depends on the format returned by `add_segmentation_temp`)
+
+        :param i_max:
+            The maximum index along the first dimension.
+        :type i_max: int
+
+        :param j_max:
+            The maximum index along the second dimension.
+        :type j_max: int
+
+        :param loop:
+            Parameter specifying the loop count or iterations.
+        :type loop: int
+
+        :param gap:
+            The gap parameter used in segmentation adjustments.
+        :type gap: int
+
+        :return:
+            None. The segmentation results are stored in `self.segmentation_final`.
+        :rtype: None
+        """
+
         # Add segmentation results to the spatial object
         self.segmentation_final = add_segmentation_temp(
             segmentation_results, i_max, j_max, loop, gap
         )
 
     def generate_cell_spots_information(self, max_spot=50, cells_main_pct=float(1 / 6)):
+
+        """
+        Generates cells and spots information and creates a nearest neighbor network.
+
+        This method processes the segmentation data to extract cell and spot information.
+        It filters cells based on specified criteria and constructs a k-nearest neighbors (kNN) network.
+
+        :param max_spot:
+            The maximum number of spots per cell to consider. Defaults to `50`.
+        :type max_spot: int, optional
+
+        :param cells_main_pct:
+            The minimum percentage of a cell that must be present in a spot to be considered.
+            Defaults to `1/6`.
+        :type cells_main_pct: float, optional
+
+        :return:
+            None. The method updates the spatial object attributes with cells, spots, and network information.
+        :rtype: None
+        """
 
         # Generate cells and spots information, and create a nearest neighbor network
         print("Generating cells information.")

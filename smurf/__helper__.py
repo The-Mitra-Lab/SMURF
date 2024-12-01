@@ -39,7 +39,41 @@ def prepare_dataframe_image(
 ):
 
     """
-    This function is to map the image to spots.
+    Prepares the spatial data object by mapping tissue image data to spot positions.
+
+    This function reads the high-resolution tissue image and the corresponding spot position data
+    from a Parquet file. It calculates pixel boundaries for each spot and creates a spatial object
+    that maps the image to the tissue spots. The spatial object can be used for downstream analysis,
+    such as extracting spot-specific image data or overlaying spatial expression data on the image.
+
+    :param df_path:
+        The file path to the Parquet file containing spot position data.
+        e.g., 'square_002um/spatial/tissue_positions.parquet'. The DataFrame should contain columns like
+        'pxl_row_in_fullres', 'pxl_col_in_fullres', 'array_row', 'array_col', and 'in_tissue'.
+    :type df_path: str
+
+    :param img_path:
+        The file path to the full-resolution image.
+        e.g., 'Visium_HD_Mouse_Small_Intestine_tissue_image.btf'.
+    :type img_path: str
+
+    :param image_format:
+        The format of the image. Must be either 'HE' or 'DAPI'. Defaults to 'HE'.
+    :type image_format: str, optional
+
+    :param row_number:
+        The number of rows in the spot array (used for calculating average spot sizes). Defaults to 3350.
+    :type row_number: int, optional
+
+    :param col_number:
+        The number of columns in the spot array (used for calculating average spot sizes). Defaults to 3350.
+    :type col_number: int, optional
+
+    :return:
+        A spatial_object containing the image array, DataFrame with spot data, adjusted spot boundaries,
+        and other spatial mappings necessary for spatial analysis.
+    :rtype: spatial_object
+
     """
 
     if image_format not in ["HE", "DAPI"]:
@@ -149,7 +183,31 @@ def prepare_dataframe_image(
 def nuclei_rna(adata, so, min_percent=0.4):
 
     """
-    This is to create a anndata object for nuclei.
+    Creates an AnnData object for nuclei by aggregating spot-level gene expression data.
+
+    This function processes spatial gene expression data to generate a nuclei-level AnnData object.
+    It aggregates gene expression counts from spots corresponding to individual nuclei, based on spatial
+    relationships and predefined mappings. It also filters spots based on a minimum percentage criterion
+    for inclusion.
+
+    :param adata:
+        An AnnData object containing spot-level gene expression data.
+    :type adata: anndata.AnnData
+
+    :param so:
+        A spatial_object containing image data, spot mappings, and spatial relationships.
+    :type so: spatial_object
+
+    :param min_percent:
+        The minimum percentage threshold for including neighboring spots in the cell aggregation.
+        Spots with a proportion below this threshold will be excluded. Defaults to 0.4.
+    :type min_percent: float, optional
+
+    :return:
+        The updated spatial_object `so` with a new attribute `final_nuclei`, which is an AnnData object
+        containing nuclei-level gene expression data.
+    :rtype: spatial_object
+
     """
 
     # Create a mapping from spot positions to indices in the adata object
@@ -312,7 +370,7 @@ def nuclei_rna(adata, so, min_percent=0.4):
 def singlecellanalysis(
     adata,
     save=False,
-    i=None,
+    iter=None,
     path=None,
     resolution=2,
     regress_out=True,
@@ -321,7 +379,63 @@ def singlecellanalysis(
 ):
 
     """
-    This function is for regular single cell analysis for iterations.
+    Performs standard single-cell RNA-seq analysis, including preprocessing, dimensionality reduction,
+    clustering, and visualization.
+
+    This function takes an AnnData object containing single-cell gene expression data and performs a series
+    of standard analysis steps:
+
+    - Filters genes expressed in a minimum number of cells.
+    - Calculates quality control (QC) metrics, including mitochondrial gene content.
+    - Normalizes and log-transforms the data.
+    - Identifies highly variable genes.
+    - Regresses out effects of total counts and mitochondrial gene expression (optional).
+    - Scales the data.
+    - Performs principal component analysis (PCA).
+    - Computes the neighborhood graph and UMAP embedding.
+    - Performs Leiden clustering.
+    - Optionally visualizes the UMAP embedding colored by cluster assignments.
+
+    :param adata:
+        An AnnData object containing single-cell gene expression data.
+    :type adata: anndata.AnnData
+
+    :param save:
+        Whether to save the UMAP plot. If `True`, saves the plot with a default filename.
+        If a string is provided, saves the plot with the given filename. Defaults to `False`.
+    :type save: bool or str, optional
+
+    :param iter:
+        An iteration or index number used in saving the plot filename.
+        Only used if `save` is `True`. Defaults to `None`.
+    :type i: int or None, optional
+
+    :param path:
+        The directory path where the plot will be saved. Not used in the current implementation.
+        Defaults to `None`.
+    :type path: str or None, optional
+
+    :param resolution:
+        The resolution parameter for Leiden clustering, controlling the granularity of the clusters.
+        Defaults to `2`.
+    :type resolution: float, optional
+
+    :param regress_out:
+        Whether to regress out effects of total counts and mitochondrial percentage during preprocessing.
+        Defaults to `True`.
+    :type regress_out: bool, optional
+
+    :param random_state:
+        The seed for random number generators to ensure reproducibility. Defaults to `0`.
+    :type random_state: int, optional
+
+    :param show:
+        Whether to print progress messages and show plots. Defaults to `True`.
+    :type show: bool, optional
+
+    :return:
+        The AnnData object after processing, including clustering results and UMAP embeddings.
+    :rtype: anndata.AnnData
     """
 
     # Ignore warnings related to sparse matrices and IOStream
@@ -382,7 +496,7 @@ def singlecellanalysis(
     if show:
         # Plot the UMAP with clusters
         if save:
-            sc.pl.umap(adata, color=["leiden"], save=str(i) + "_umap.png")
+            sc.pl.umap(adata, color=["leiden"], save=str(iter) + "_umap.png")
         elif save == False:
             sc.pl.umap(adata, color=["leiden"])
         else:
@@ -396,7 +510,54 @@ def expanding_cells(
 ):
 
     """
-    This function is for expanding cells.
+    Expands cell regions by iteratively adding neighboring spots based on a scoring criterion.
+
+    This function aims to grow the regions of cells in spatial data by evaluating neighboring spots
+    and including them if they improve a cell-specific score. The score is calculated using the dot
+    product of the cell's expression vector and precomputed weights for the cell type, normalized by
+    the vector norm. Optionally, the function can perform additional processing for cortical data
+    using Delaunay triangulation to fill in cell regions more completely.
+
+    :param so:
+        A spatial object containing spatial mappings, spot data, and other necessary attributes.
+    :type so: spatial_object
+
+    :param adata_sc:
+        An AnnData object containing single-cell gene expression data with cell IDs and cell types.
+    :type adata_sc: anndata.AnnData
+
+    :param weights:
+        A dictionary mapping cell types to weight vectors used in the scoring function.
+    :type weights: dict
+
+    :param iter_cells:
+        A dictionary mapping cell IDs to the number of iterations allowed for expanding each cell.
+    :type iter_cells: dict
+
+    :param data_temp:
+        A sparse matrix containing gene expression data used for calculations during cell expansion.
+    :type data_temp: scipy.sparse.csr_matrix or similar
+
+    :param min_percent:
+        The minimum percentage threshold for including neighboring spots in the cell expansion.
+        Spots with a proportion below this threshold will be excluded. Defaults to `0.4`.
+    :type min_percent: float, optional
+
+    :param cortex:
+        If `True`, performs additional processing suitable for cortical data using Delaunay triangulation
+        to fill in cell regions. Defaults to `False`.
+    :type cortex: bool, optional
+
+    :return:
+        A tuple containing:
+
+        - `cells_final` (dict): A dictionary mapping cell IDs to their final set of spots after expansion.
+        - `final_data` (scipy.sparse.lil_matrix): A matrix containing the aggregated gene expression data
+          for each expanded cell.
+        - `cellscore` (numpy.ndarray): An array containing the final score for each cell.
+        - `length_final` (numpy.ndarray): An array containing the final number of spots for each cell.
+    :rtype: tuple
+
     """
 
     cells_final = {}
@@ -626,6 +787,36 @@ def expanding_cells(
 
 def return_celltype_plot(adata_sc, so, cluster_name="leiden"):
 
+    """
+    Generates a cell type assignment array based on clustering results for visualization.
+
+    This function creates an array where each pixel in the segmentation corresponds to a cell type
+    cluster. It maps cell IDs from the spatial segmentation to their assigned cluster types obtained
+    from clustering analysis (e.g., Leiden clustering) in the `adata_sc` AnnData object.
+
+    :param adata_sc:
+        An AnnData object containing single-cell gene expression data and clustering results.
+    :type adata_sc: anndata.AnnData
+
+    :param so:
+        A spatial object containing the segmentation data and mappings between spatial coordinates
+        and cell IDs.
+    :type so: spatial_object
+
+    :param cluster_name:
+        The key in `adata_sc.obs` that contains the cluster assignments. Defaults to `'leiden'`.
+    :type cluster_name: str, optional
+
+    :return:
+        An array where each pixel corresponds to a cell type cluster, suitable for visualization.
+    :rtype: numpy.ndarray
+
+    :example:
+        ```python
+        cell_type_final = return_celltype_plot(adata_sc, so, cluster_name='leiden')
+        ```
+    """
+
     # Initialize an array to hold the final cell type assignments
     cell_type_final = np.zeros(so.segmentation_final.shape)
     cell_type_dic = {}
@@ -652,6 +843,34 @@ def return_celltype_plot(adata_sc, so, cluster_name="leiden"):
 
 
 def plot_cellcluster_position(cell_cluster_final, col_num=5):
+
+    """
+    Plots the spatial distribution of cell clusters and individual cell types.
+
+    This function visualizes the overall distribution of all cell clusters and creates separate
+    plots for each individual cell type. It arranges the plots in a grid layout based on the
+    specified number of columns.
+
+    :param cell_cluster_final:
+        A 2D NumPy array where each element corresponds to a cell cluster label at a particular spatial position.
+        Cluster labels are integers starting from 0 (background or unassigned) up to the maximum number of clusters.
+    :type cell_cluster_final: numpy.ndarray
+
+    :param col_num:
+        The number of columns to use in the grid layout for subplots. Determines how the plots are arranged.
+        Defaults to `5`.
+    :type col_num: int, optional
+
+    :return:
+        None. The function displays the plots and closes the figure after rendering.
+    :rtype: None
+
+    :example:
+        ```python
+        # Assuming 'cell_cluster_final' is your cluster label array
+        plot_cellcluster_position(cell_cluster_final, col_num=4)
+        ```
+    """
 
     # Determine the maximum cell type value
     max_type = int(np.max(cell_cluster_final))
@@ -707,6 +926,58 @@ def itering_arragement(
     show=True,
     keep_previous=False,
 ):
+
+    """
+    Performs iterative cell arrangement for spatial transcriptomics analysis.
+
+    This function iteratively refines cell type assignments and spatial arrangements by expanding cells,
+    updating weights, and recalculating clustering assignments. It aims to optimize cell type assignments
+    based on mutual information scores between iterations.
+
+    :param adata_sc:
+        An AnnData object containing single-cell gene expression data with initial clustering results.
+    :type adata_sc: anndata.AnnData
+
+    :param adata_raw:
+        An AnnData object containing the raw (unprocessed) single-cell gene expression data.
+    :type adata_raw: anndata.AnnData
+
+    :param adata:
+        An AnnData object containing spatial gene expression data.
+    :type adata: anndata.AnnData
+
+    :param so:
+        A spatial object containing spatial mappings, spot data, and other necessary attributes.
+    :type so: spatial_object
+
+    :param resolution:
+        The resolution parameter for clustering during iterative analysis. Controls the granularity of clusters.
+        Defaults to `2`.
+    :type resolution: float, optional
+
+    :param regress_out:
+        Whether to regress out effects of total counts and mitochondrial percentage during preprocessing.
+        Defaults to `True`.
+    :type regress_out: bool, optional
+
+    :param save_folder:
+        The directory path where intermediate and final results will be saved. Defaults to `'results_example/'`.
+    :type save_folder: str, optional
+
+    :param show:
+        Whether to print progress messages and show plots during the iterative process. Defaults to `True`.
+    :type show: bool, optional
+
+    :param keep_previous:
+        Whether to keep intermediate files from previous iterations. If `False`, old files will be deleted to save space.
+        Defaults to `False`.
+    :type keep_previous: bool, optional
+
+    :return:
+        None. The function saves intermediate and final results to the specified folder.
+    :rtype: None
+
+    """
 
     new_length = np.zeros((so.indices.shape[0], 2))
     for i in range(so.indices.shape[0]):
@@ -868,6 +1139,50 @@ def make_pixels_cells(
     nonzero_indices_dic,
     seed=42,
 ):
+
+    """
+    Assigns cells to pixels in the spatial data based on spot compositions.
+
+    This function creates a new pixel-level cell assignment matrix by combining initial cell assignments
+    with additional cell composition information. It normalizes the proportions and updates the spatial object
+    with the new cell assignments.
+
+    :param so:
+        A spatial object containing spatial mappings, spot data, and other necessary attributes.
+    :type so: spatial_object
+
+    :param adata:
+        An AnnData object containing spatial gene expression data.
+    :type adata: anndata.AnnData
+
+    :param cells_before_ml:
+        A dictionary containing initial cell assignments before machine learning adjustments.
+    :type cells_before_ml: dict
+
+    :param spot_cell_dic:
+        A dictionary mapping spots to cell composition data after machine learning adjustments.
+    :type spot_cell_dic: dict
+
+    :param spots_id_dic:
+        A dictionary mapping spot IDs to their corresponding indices.
+    :type spots_id_dic: dict
+
+    :param spots_id_dic_prop:
+        A dictionary containing the proportions of spots after adjustments.
+    :type spots_id_dic_prop: dict
+
+    :param nonzero_indices_dic:
+        A dictionary of non-zero indices for each spot, indicating cell presence.
+    :type nonzero_indices_dic: dict
+
+    :param seed:
+        The random seed for reproducibility when assigning cells to pixels. Defaults to `42`.
+    :type seed: int, optional
+
+    :return:
+        The updated spatial object `so` with the new pixel-level cell assignments stored in `so.pixels_cells`.
+    :rtype: spatial_object
+    """
 
     # Set the random seed for reproducibility
     np.random.seed(seed)
@@ -1168,6 +1483,57 @@ def plot_results(
     figsize=(20, 20),
     save=None,
 ):
+
+    """
+    Plots the original tissue image with cell type assignments overlayed.
+
+    This function visualizes the results of cell type assignments by overlaying them on the original
+    tissue image. It handles cases where there are many cell types and adjusts the plot accordingly.
+    Optionally, it includes a legend with cell type labels.
+
+    :param original_image:
+        The original tissue image as a NumPy array (normally use `so.image_temp()`).
+    :type original_image: numpy.ndarray
+
+    :param result_image:
+        An array where each pixel corresponds to a cell type label after processing (normally use `so.pixels_cells`).
+    :type result_image: numpy.ndarray
+
+    :param transparency:
+        The transparency level of the cell type overlay. Must be between 0 and 1. Defaults to `0.6`.
+    :type transparency: float, optional
+
+    :param transparent_background:
+        Whether to use a transparent background for the overlay. Defaults to `False`.
+    :type transparent_background: bool, optional
+
+    :param include_label:
+        Whether to include a legend with cell type labels. If `None`, the function decides based on the number of cell types.
+        Defaults to `None`.
+    :type include_label: bool or None, optional
+
+    :param colors:
+        A list of RGB tuples representing colors for each cell type. If `None`, a default color palette is used for up to 50 cell types.
+        Defaults to `None`.
+    :type colors: list of tuples or None, optional
+
+    :param dpi:
+        The resolution of the plot in dots per inch. Defaults to `1500`.
+    :type dpi: int, optional
+
+    :param figsize:
+        The size of the figure in inches (width, height). Defaults to `(20, 20)`.
+    :type figsize: tuple, optional
+
+    :param save:
+        The file path to save the figure. If `None`, the figure will not be saved. Defaults to `None`.
+    :type save: str or None, optional
+
+    :return:
+        None. The function displays the plot and optionally saves it to a file.
+    :rtype: None
+
+    """
 
     if transparency <= 0 or transparency > 1:
         raise TypeError("Please input transparency in (0,1].")

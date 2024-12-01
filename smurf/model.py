@@ -34,6 +34,73 @@ def start_optimization(
     print_memory=False,
 ):
 
+    """
+    Starts the optimization process to estimate cell-type proportions in each spot using PyTorch.
+
+    This function performs optimization using a custom neural network layer implemented in PyTorch.
+    It aims to learn the weights (proportions) of cells in each spot that best reconstruct the observed
+    gene expression data. The optimization minimizes the difference between the predicted and true cell
+    type expression profiles using cosine similarity.
+
+    :param spots_X:
+        A dictionary where each key is a group identifier, and each value is a NumPy array of spot expression matrices for that group.
+    :type spots_X: dict
+
+    :param celltype_X:
+        A dictionary where each key is a group identifier, and each value is a NumPy array of cell-type-specific weight matrices for that group.
+    :type celltype_X: dict
+
+    :param cells_X_plus:
+        A dictionary where each key is a group identifier, and each value is a NumPy array of cell expression matrices for that group.
+    :type cells_X_plus: dict
+
+    :param nonzero_indices_dic:
+        A dictionary where each key is a group identifier, and each value is a list of non-zero indices indicating cell presence in spots for that group.
+    :type nonzero_indices_dic: dict
+
+    :param device:
+        The device on which to perform the computation (e.g., `'cpu'` or `'cuda'`).
+    :type device: str
+
+    :param num_epochs:
+        The number of training epochs for the optimization. Defaults to `1000`.
+    :type num_epochs: int, optional
+
+    :param learning_rate:
+        The learning rate for the optimizer. Defaults to `0.1`.
+    :type learning_rate: float, optional
+
+    :param print_each:
+        Frequency of printing the training loss. Prints every `print_each` epochs. Defaults to `100`.
+    :type print_each: int, optional
+
+    :param epsilon:
+        Threshold for early stopping based on minimal loss improvement. Defaults to `1e-3`.
+    :type epsilon: float, optional
+
+    :param random_seed:
+        Random seed for reproducibility. Defaults to `42`.
+    :type random_seed: int, optional
+
+    :param print_memory:
+        Whether to print GPU memory usage during training. Requires `pynvml`. Defaults to `False`.
+    :type print_memory: bool, optional
+
+    :return:
+        A dictionary `spot_cell_dic` where each key is a group identifier, and each value is a list of learned weights (cell proportions) for that group.
+    :rtype: dict
+
+    :dependencies:
+        - This function requires the following packages:
+            - `torch`
+            - `torch.nn`
+            - `torch.optim`
+            - `torch.nn.functional` (for `cosine_similarity`)
+            - `pynvml` (optional, for GPU memory tracking if `print_memory` is `True`)
+
+
+    """
+
     # Function to start the optimization process using PyTorch
     if (
         torch is None

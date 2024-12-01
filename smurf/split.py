@@ -70,6 +70,53 @@ def make_preparation(
     """
     Prepares data for optimization by organizing cells and spots, calculating weights,
     and grouping cells for computational efficiency.
+
+    This function processes the final cell assignments and spatial data to prepare inputs
+    for optimization algorithms. It organizes cells and spots,
+    calculates cell-type-specific weights, and groups cells to limit computational load,
+    ensuring efficient processing especially when dealing with a large number of cells.
+
+    :param cells_final:
+        A dictionary mapping cell IDs to their final set of spots after expansion.
+    :type cells_final: dict
+
+    :param so:
+        A spatial object containing spatial mappings, spot data, and other necessary attributes.
+    :type so: spatial_object
+
+    :param adatas_final:
+        An AnnData object containing the final single-cell gene expression data after processing.
+    :type adatas_final: anndata.AnnData
+
+    :param adata:
+        An AnnData object containing spatial gene expression data.
+    :type adata: anndata.AnnData
+
+    :param weight_to_celltype:
+        A NumPy array where each row corresponds to a cell type and contains weight vectors
+        used in the optimization.
+    :type weight_to_celltype: numpy.ndarray
+
+    :param maximum_cells:
+        The maximum number of cells to include in a group for optimization. This parameter
+        helps limit computational load by grouping cells accordingly. Defaults to `10000`.
+    :type maximum_cells: int, optional
+
+    :return:
+        A tuple containing:
+
+        - `pct_toml_dic` (dict): Dictionary containing spot IDs and their associated proportions and cell types.
+        - `spots_X_dic` (dict): Dictionary of spot expression matrices for each group.
+        - `celltypes_dic` (dict): Dictionary of cell-type-specific weight matrices for each group.
+        - `cells_X_plus_dic` (dict): Dictionary of cell expression matrices for each group.
+        - `nonzero_indices_dic` (dict): Dictionary of non-zero indices indicating cell presence in spots for each group.
+        - `nonzero_indices_toml` (dict): Dictionary of updated non-zero indices with new IDs for optimization.
+        - `cells_before_ml` (dict): Dictionary of cells and their assigned spots before machine learning adjustments.
+        - `cells_before_ml_x` (dict): Dictionary of cell expression data aggregated before machine learning.
+        - `groups_combined` (dict): Dictionary of cell groups formed to limit computational load.
+        - `spots_id_dic` (dict): Dictionary of spot IDs for each group.
+        - `spots_id_dic_prop` (dict): Dictionary of spot proportions for each group.
+
     """
     epsilon = 1e-8
 
@@ -501,6 +548,33 @@ def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
 
     """
     Calculates the weight matrix mapping cell types to gene expression profiles.
+
+    This function computes the average gene expression profiles for each cell type based on the provided single-cell data and spatial data. The resulting weight matrix is normalized and can be used in downstream analyses, such as cell type proportion estimation.
+
+    :param adatas_final:
+        An AnnData object containing the final single-cell gene expression data after processing.
+    :type adatas_final: anndata.AnnData
+
+    :param adata:
+        An AnnData object containing spatial gene expression data.
+    :type adata: anndata.AnnData
+
+    :param cells_final:
+        A dictionary mapping cell IDs to their final set of spots after expansion.
+    :type cells_final: dict
+
+    :param so:
+        A spatial object containing spatial mappings, spot data, and other necessary attributes.
+    :type so: spatial_object
+
+    :return:
+        A NumPy array where each row corresponds to a cell type and contains the normalized average gene expression profile.
+    :rtype: numpy.ndarray
+
+    :example:
+        ```python
+        weight_to_celltype = calculate_weight_to_celltype(adatas_final, adata, cells_final, so)
+        ```
     """
 
     cell_ids = list(adatas_final.obs.index.astype(float))
@@ -548,6 +622,61 @@ def get_finaldata(
 
     """
     Combines cell and spot data after optimization to generate the final single-cell dataset.
+
+    This function aggregates gene expression data from spots and assigns counts to individual cells based on the results of optimization algorithms. It generates a final AnnData object containing single-cell gene expression data, along with cell metadata such as cluster assignments and spatial coordinates.
+
+    :param adata:
+        An AnnData object containing spatial gene expression data.
+    :type adata: anndata.AnnData
+
+    :param adatas_final:
+        An AnnData object containing the final single-cell gene expression data after processing.
+    :type adatas_final: anndata.AnnData
+
+    :param spot_cell_dic:
+        A dictionary containing the proportion of each cell in each spot after optimization.
+    :type spot_cell_dic: dict
+
+    :param weight_to_celltype:
+        A NumPy array where each row corresponds to a cell type and contains weight vectors used in the scoring function.
+    :type weight_to_celltype: numpy.ndarray
+
+    :param cells_before_ml:
+        A dictionary of cells and their assigned spots before machine learning adjustments.
+    :type cells_before_ml: dict
+
+    :param groups_combined:
+        A dictionary of cell groups formed to limit computational load.
+    :type groups_combined: dict
+
+    :param pct_toml_dic:
+        Dictionary containing spot IDs and their associated proportions and cell types.
+    :type pct_toml_dic: dict
+
+    :param nonzero_indices_dic:
+        Dictionary of non-zero indices indicating cell presence in spots for each group.
+    :type nonzero_indices_dic: dict
+
+    :param spots_X_dic:
+        (Optional) Dictionary of spot expression matrices for each group. If not provided, it will be computed.
+    :type spots_X_dic: dict, optional
+
+    :param nonzero_indices_toml:
+        (Optional) Dictionary of updated non-zero indices with new IDs for optimization.
+    :type nonzero_indices_toml: dict, optional
+
+    :param cells_before_ml_x:
+        (Optional) Dictionary of cell expression data aggregated before machine learning.
+    :type cells_before_ml_x: dict, optional
+
+    :param so:
+        (Optional) A spatial object containing spatial mappings and data. If provided, spatial coordinates will be added to the final dataset.
+    :type so: spatial_object, optional
+
+    :return:
+        An AnnData object containing the final single-cell gene expression data, along with cell metadata.
+    :rtype: anndata.AnnData
+
     """
 
     binnumbers = {}
@@ -763,7 +892,41 @@ def get_finaldata_fast(
 ):
 
     """
-    Fast version to get the final data. Suitable for users with no GPU resources.
+    Quickly generates the final single-cell dataset by combining cell and spot data without using GPU resources.
+
+    This function provides a faster alternative to generate the final single-cell gene expression dataset,
+    suitable for users who do not have access to GPU resources. It aggregates gene expression data from spots
+    and assigns counts to individual cells based on optimized proportions. Optionally, it can plot the spatial
+    distribution of cells on the tissue image.
+
+    :param cells_final:
+        A dictionary mapping cell IDs to their final set of spots after expansion.
+    :type cells_final: dict
+
+    :param so:
+        A spatial object containing spatial mappings, spot data, and other necessary attributes.
+    :type so: spatial_object
+
+    :param adatas_final:
+        An AnnData object containing the final single-cell gene expression data after processing.
+    :type adatas_final: anndata.AnnData
+
+    :param adata:
+        An AnnData object containing spatial gene expression data.
+    :type adata: anndata.AnnData
+
+    :param weight_to_celltype:
+        A NumPy array where each row corresponds to a cell type and contains weight vectors used in the scoring function.
+    :type weight_to_celltype: numpy.ndarray
+
+    :param plot:
+        Whether to plot the cells on the spatial map after processing. Defaults to `True`. This may cost some time.
+    :type plot: bool, optional
+
+    :return:
+        An AnnData object containing the final single-cell gene expression data, along with cell metadata.
+    :rtype: anndata.AnnData
+
     """
 
     weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
