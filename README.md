@@ -14,6 +14,7 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform so
   - [Create conda ](#create-conda-)
   - [Lite version ](#lite-version-)
   - [Full version (GPU needed)](#full-version-gpu-needed)
+- [Developer version](#developer-version)
 - [Tutorial ](#tutorial-)
   - [Lite version. ](#lite-version--1)
   - [Full version (GPU needed). ](#full-version-gpu-needed-)
@@ -57,6 +58,20 @@ pip install "pysmurf[full]"
 ```
 
 The only difference between the full version and the lite version is that the full version ensures that the required version of PyTorch (and related packages) are correctly installed.
+
+# Developer version
+
+To install the Developer version, run the following command:
+
+```bash
+pip install git+https://github.com/The-Mitra-Lab/SMURF.git
+```
+
+or
+
+```bash
+pip install git+https://github.com/The-Mitra-Lab/SMURF[full].git
+```
 
 
 # Tutorial <a name="Tutorial"></a>
