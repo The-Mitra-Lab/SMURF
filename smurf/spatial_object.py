@@ -227,7 +227,6 @@ def add_segmentation_temp(segmentation_results, i_max, j_max, loop, gap):
 
 
 class spatial_object:
-
     """
     A class to represent and manage spatial data, including images, spot information, and cell segmentation.
 
