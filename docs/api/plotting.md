@@ -65,3 +65,17 @@ This function allows you to plot results with the same format as So.segmentation
 import smurf as su
 su.plot_results(so.image_temp(), so.pixels_cells)
 ```
+
+```{eval-rst}
+.. currentmodule:: smurf
+
+```
+
+```{eval-rst}
+.. autosummary::
+   :toctree: reference/
+   :nosignatures:
+
+   plot_cellcluster_position
+   plot_results
+```
