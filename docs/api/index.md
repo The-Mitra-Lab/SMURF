@@ -13,5 +13,6 @@ import smurf as su
 
 plotting
 model
+spatial_object
 
 ```
