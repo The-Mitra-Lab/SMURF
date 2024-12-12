@@ -17,10 +17,10 @@ import smurf as su
    :nosignatures:
 
    spatial_object
-   spatial_object.add_segmentation_temp
-   spatial_object.cells
-   spatial_object.create_cells_main
-   spatial_object.knn
-   spatial_object.spots
-   spatial_object.to_dict
+   add_segmentation_temp
+   cells
+   create_cells_main
+   knn
+   spots
+   to_dict
 ```
