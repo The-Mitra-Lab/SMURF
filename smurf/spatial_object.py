@@ -335,7 +335,6 @@ class spatial_object:
         self.final_nuclei = None
 
     def image_temp(self):
-
         """
         Returns the cropped image based on the specified boundaries.
 
@@ -361,7 +360,6 @@ class spatial_object:
             print("Please input 'HE' or 'DAPI'.")
 
     def add_segmentation(self, segmentation_results, i_max, j_max, loop, gap):
-
         """
         Adds segmentation results to the spatial object.
 
@@ -396,7 +394,6 @@ class spatial_object:
         )
 
     def generate_cell_spots_information(self, max_spot=50, cells_main_pct=float(1 / 6)):
-
         """
         Generates cells and spots information and creates a nearest neighbor network.
 

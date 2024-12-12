@@ -17,10 +17,7 @@ import smurf as su
    :nosignatures:
 
    spatial_object
-   add_segmentation_temp
-   cells
-   create_cells_main
-   knn
-   spots
-   to_dict
+   spatial_object.image_temp
+   spatial_object.add_segmentation
+   spatial_object.generate_cell_spots_information
 ```
