@@ -12,5 +12,6 @@ import smurf as su
 :maxdepth: 2
 
 plotting
+model
 
 ```
