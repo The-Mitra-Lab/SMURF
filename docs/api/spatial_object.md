@@ -8,7 +8,10 @@ import smurf as su
 
 ```{eval-rst}
 .. currentmodule:: smurf
+```
 
+```{eval-rst}
+.. autoclass::
 ```
 
 ```{eval-rst}
