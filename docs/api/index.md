@@ -9,9 +9,8 @@ import smurf as su
 ```{toctree}
 :maxdepth: 2
 
-model
-plotting
+autodoc
+smurf
 spatial_object
-split
 
 ```

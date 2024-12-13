@@ -1,4 +1,4 @@
-# Split
+# SMURF
 
 Import SMURF as:
 
@@ -20,4 +20,7 @@ import smurf as su
    get_finaldata
    get_finaldata_fast
    make_preparation
+   plot_cellcluster_position
+   plot_results
+   start_optimization
 ```
