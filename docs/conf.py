@@ -147,11 +147,11 @@ def linkcode_resolve(domain, info):
 html_theme = "furo"
 
 # Set link name generated in the top bar.
-html_title = "smurf"
+html_title = "SMURF"
 # html_logo = "_static/logo.png"
 
 html_theme_options = {
-    "sidebar_hide_name": True,
+    "sidebar_hide_name": False,
     "light_css_variables": {
         "color-brand-primary": "#003262",
         "color-brand-content": "#003262",
