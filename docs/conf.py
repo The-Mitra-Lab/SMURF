@@ -35,7 +35,7 @@ extensions = [
     "sphinxext.opengraph",
     "hoverxref.extension",
 ]
-github_repo = "https://github.com/rhagenson/SMURF"
+github_repo = "https://github.com/The-Mitra-Lab/SMURF"
 
 bibtex_default_style = "plain"
 

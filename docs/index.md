@@ -53,7 +53,7 @@ If you find a model useful for your research, please cite the following (paper o
 
 ```{eval-rst}
 .. card:: GitHub :octicon:`mark-github;1em;`
-    :link: https://github.com/rhagenson/SMURF
+    :link: https://github.com/The-Mitra-Lab/SMURF
 
     Ask questions, report bugs, and contribute to *SMURF* at our GitHub repository.
 ```
@@ -69,5 +69,5 @@ user_guide/index
 api/index
 release_notes/index
 references
-GitHub <https://github.com/rhagenson/SMURF>
+GitHub <https://github.com/The-Mitra-Lab/SMURF>
 ```
