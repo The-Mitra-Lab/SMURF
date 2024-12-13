@@ -7,7 +7,6 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform so
 
 ## Contents
 
-
 - [Segmentation and Manifold UnRolling Framework (SMURF)](#segmentation-and-manifold-unrolling-framework-smurf)
   - [Contents](#contents)
 - [Installation ](#installation-)
@@ -19,9 +18,6 @@ We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform so
   - [Lite version. ](#lite-version--1)
   - [Full version (GPU needed). ](#full-version-gpu-needed-)
   - [External reference: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method). ](#external-reference-nuclei-segmentation-skip-this-section-if-you-have-already-segmented-your-data-with-your-preferred-segmentation-method-)
-- [Introduction for important functions and object.  ](#introduction-for-important-functions-and-object--)
-  - [`SO` Important Features:](#so-important-features)
-  - [`SO` Greate Results:](#so-greate-results)
 - [Citation  ](#citation--)
 
 
@@ -93,36 +89,6 @@ SMURF relies on external packages for nuclei segmentation to create a so (a spat
 [Link to view](https://nbviewer.org/github/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
 
 [Link to file](https://github.com/The-Mitra-Lab/SMURF/blob/main/test/Tutorial_cell_segmentation.ipynb)
-
-
-# Introduction for important functions and object.  <a name="Introduction"></a>
-
-Here are some tips for using `so` so (a spatial object datastructure).
-
-## `SO` Important Features:
-
-- **`so.image_temp()`**
-  - Provides the image portion covered by spots.
-
-- **`So.segmentation_final`**
-  - Gives the nuclei segmentation plot.
-
-- **`So.pixels_cells`**
-  - Represents the final results of cells with the same format as `So.segmentation_final`.
-
-- **`So.final_nuclei`**
-  - Stores the nuclei * genes `adata` matrix.
-
-## `SO` Greate Results:
-
-- **`adata_sc_final`**
-  - `obs`:
-    - `cell_cluster`: Denotes the cluster assignment from the iteration.
-    - `cos_simularity`: The cosine similarity of the cell's gene expression with the average expression of its cluster.
-    - `cell_size`: The number of `2um` spots occupied by this cell.
-    - `x` and `y`: The absolute coordinates of the cell, matching the spot locations provided by 10x.
-  - `var`:
-    - The same as 10x provide for spots*genes array.
 
 # Citation  <a name="Citation"></a>
 
