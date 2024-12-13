@@ -11,10 +11,6 @@ import smurf as su
 ```
 
 ```{eval-rst}
-.. autoclass::
-```
-
-```{eval-rst}
 .. autosummary::
    :toctree: reference/
    :nosignatures:
