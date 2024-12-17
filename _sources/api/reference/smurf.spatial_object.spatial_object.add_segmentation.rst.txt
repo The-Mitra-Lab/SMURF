@@ -1,0 +1,6 @@
+﻿smurf.spatial\_object.spatial\_object.add\_segmentation
+=======================================================
+
+.. currentmodule:: smurf.spatial_object
+
+.. automethod:: spatial_object.add_segmentation
