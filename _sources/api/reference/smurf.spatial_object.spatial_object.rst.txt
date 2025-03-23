@@ -1,0 +1,25 @@
+﻿smurf.spatial\_object.spatial\_object
+=====================================
+
+.. currentmodule:: smurf.spatial_object
+
+.. autoclass:: spatial_object
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~spatial_object.__init__
+      ~spatial_object.add_segmentation
+      ~spatial_object.generate_cell_spots_information
+      ~spatial_object.image_temp
+   
+   
+
+   
+   
+   
