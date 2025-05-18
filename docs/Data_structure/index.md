@@ -7,16 +7,16 @@ Here are some tips for using `so` (a spatial object datastructure).
 - **`so.image_temp()`**
   - Provides the image portion covered by spots.
 
-- **`So.segmentation_final`**
+- **`so.segmentation_final`**
   - Gives the nuclei segmentation plot.
 
-- **`So.pixels_cells`**
-  - Represents the final results of cells with the same format as `So.segmentation_final`.
+- **`so.pixels_cells`**
+  - Represents the final results of cells with the same format as `so.segmentation_final`.
 
-- **`So.final_nuclei`**
+- **`so.final_nuclei`**
   - Stores the nuclei * genes `adata` matrix.
 
-## `SO` Greate Results:
+## `SO` Great Results:
 
 - **`adata_sc_final`**
   - `obs`:
