@@ -1,4 +1,4 @@
-# User guide
+# Data Structure
 
 Here are some tips for using `so` (a spatial object datastructure).
 
