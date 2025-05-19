@@ -65,7 +65,7 @@ This function allows you to plot results with the same format as So.segmentation
 - **`ransparent_background`** *(bool, optional)*:
   - Whether the zero parts of `result_image` should be transparent.
 
-- **`**include_label`** *(bool, optional)*:
+- **`include_label`** *(bool, optional)*:
   -  Whether to include a label indicating which color refers to which cluster. Useful for cell cluster results and only valid when the number of unique clusters is ≤ 50.
 
 - **`colors`** *(list of tuples, optional)*:
