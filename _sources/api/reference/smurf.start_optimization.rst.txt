@@ -1,0 +1,6 @@
+﻿smurf.start\_optimization
+=========================
+
+.. currentmodule:: smurf
+
+.. autofunction:: start_optimization

@@ -1,0 +1,6 @@
+﻿smurf.make\_pixels\_cells
+=========================
+
+.. currentmodule:: smurf
+
+.. autofunction:: make_pixels_cells

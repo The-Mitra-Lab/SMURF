@@ -1,0 +1,6 @@
+﻿smurf.spatial\_object.spatial\_object.generate\_cell\_spots\_information
+========================================================================
+
+.. currentmodule:: smurf.spatial_object
+
+.. automethod:: spatial_object.generate_cell_spots_information
