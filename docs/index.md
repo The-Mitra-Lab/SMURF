@@ -65,7 +65,7 @@ If you find a model useful for your research, please cite the following (paper o
 
 installation
 tutorials/index
-user_guide/index
+Data_structure/index
 api/index
 release_notes/index
 references

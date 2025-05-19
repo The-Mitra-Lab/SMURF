@@ -25,3 +25,12 @@ notebooks/Tutorial_Mousebrian_full
 
 notebooks/Tutorial_cell_segmentation
 ```
+
+
+## Unrolling Example
+
+```{toctree}
+:maxdepth: 1
+
+notebooks/unroll_example
+```
