@@ -64,17 +64,14 @@ pip install git+https://github.com/The-Mitra-Lab/SMURF[full].git
 
 # Citation  <a name="Citation"></a>
 
-Paper on the way...
-
 ```latex
 
-@misc{smurf,
-  author = {Juanru Guo and The Mitra Lab},
-  title = {SMURF: Segmentation and Manifold UnRolling Framework},
-  year = {2024},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/The-Mitra-Lab/SMURF}},
+@article{guo2025smurf,
+  author    = {Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan A. and Valentine, Mark C. and Dougherty, Joseph D. and Mitra, Robi D. and Muegge, Brian D.},
+  title     = {SMURF Reconstructs Single-Cells from Visium HD Data to Reveal Zonation of Transcriptional Programs in the Intestine},
+  year = {2025},
+  journal   = {bioRxiv},
 }
+
 
 ```

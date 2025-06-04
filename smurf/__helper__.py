@@ -199,8 +199,8 @@ def nuclei_rna(adata, so, min_percent=0.4):
     :type so: spatial_object
 
     :param min_percent:
-        The minimum percentage threshold for including neighboring spots in the cell aggregation.
-        Spots with a proportion below this threshold will be excluded. Defaults to 0.4.
+        The minimum percentage of blank area within in a spot threshold for including neighboring spots in the cell aggregation.
+        Spots with a blank proportion below this threshold will be excluded. Defaults to 0.4.
     :type min_percent: float, optional
 
     :return:
@@ -1122,8 +1122,9 @@ def itering_arragement(
             # Recalculate weights
             weights = np.zeros((len(np.unique(adata_type_record[i])), adata.shape[1]))
             for j in range(len(np.unique(adata_type_record[i]))):
+                # weights[j] = csr_matrix(final_data)[adata_temp.obs.leiden == str(j)].mean(axis = 0)
                 weights[j] = csr_matrix(final_data)[
-                    adata_temp.obs.leiden == str(j)
+                    (adata_temp.obs.leiden == str(j)).to_numpy()
                 ].mean(axis=0)
             weights = weights / norm(weights, axis=1).reshape(-1, 1)
             weights_record[i] = weights
