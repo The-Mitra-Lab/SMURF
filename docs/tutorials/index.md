@@ -18,19 +18,18 @@ notebooks/Tutorial_Mousebrian
 notebooks/Tutorial_Mousebrian_full
 ```
 
-## External reference: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method)
-
-```{toctree}
-:maxdepth: 1
-
-notebooks/Tutorial_cell_segmentation
-```
-
-
 ## Unrolling Example
 
 ```{toctree}
 :maxdepth: 1
 
 notebooks/unroll_example
+```
+
+## External reference: Nuclei segmentation (skip this section if you have already segmented your data with your preferred segmentation method)
+
+```{toctree}
+:maxdepth: 1
+
+notebooks/Tutorial_cell_segmentation
 ```
