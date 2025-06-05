@@ -8,10 +8,12 @@ If you find a model useful for your research, please cite the following:
 
 ```
 @article{guo2025smurf,
-  author  = {Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan A. and Valentine, Mark C. and Dougherty, Joseph D. and Mitra, Robi D. and Muegge, Brian D.},
-  title   = {SMURF Reconstructs Single-Cells from Visium HD Data to Reveal Zonation of Transcriptional Programs in the Intestine},
-  year    = {2025},
-  journal = {bioRxiv},
+  title={SMURF Reconstructs Single-Cells from Visium HD Data to Reveal Zonation of Transcriptional Programs in the Intestine},
+  author={Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan and Valentine, Mark and Dougherty, Joseph and Mitra, Robi David and Muegge, Brian D},
+  journal={bioRxiv},
+  pages={2025--05},
+  year={2025},
+  publisher={Cold Spring Harbor Laboratory}
 }
 ```
 

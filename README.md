@@ -2,7 +2,7 @@
 
 Welcome to the SMURF repository!
 
-We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform soft segmentation of [VisiumHD data](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression), facilitating the creation of a cells*genes anndata object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation and then assigns the transcripts recovered from each capture ‘spot’ to a nearby cell. See [Tutorial](https://the-mitra-lab.github.io/SMURF/) for further details.
+We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform soft segmentation of [VisiumHD data](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression), facilitating the creation of a cells*genes anndata object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation and then assigns the transcripts recovered from each capture ‘spot’ to a nearby cell. See [Tutorial](https://the-mitra-lab.github.io/SMURF/) and [preprint paper](https://www.biorxiv.org/content/10.1101/2025.05.28.656357v1) for further details.
 
 
 ## Contents
@@ -67,10 +67,12 @@ pip install git+https://github.com/The-Mitra-Lab/SMURF[full].git
 ```latex
 
 @article{guo2025smurf,
-  author  = {Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan A. and Valentine, Mark C. and Dougherty, Joseph D. and Mitra, Robi D. and Muegge, Brian D.},
-  title   = {SMURF Reconstructs Single-Cells from Visium HD Data to Reveal Zonation of Transcriptional Programs in the Intestine},
-  year    = {2025},
-  journal = {bioRxiv},
+  title={SMURF Reconstructs Single-Cells from Visium HD Data to Reveal Zonation of Transcriptional Programs in the Intestine},
+  author={Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan and Valentine, Mark and Dougherty, Joseph and Mitra, Robi David and Muegge, Brian D},
+  journal={bioRxiv},
+  pages={2025--05},
+  year={2025},
+  publisher={Cold Spring Harbor Laboratory}
 }
 
 
