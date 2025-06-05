@@ -812,9 +812,8 @@ def return_celltype_plot(adata_sc, so, cluster_name="leiden"):
     :rtype: numpy.ndarray
 
     :example:
-        ```python
-        cell_type_final = return_celltype_plot(adata_sc, so, cluster_name='leiden')
-        ```
+    >>> cell_type_final = return_celltype_plot(adata_sc, so, cluster_name='leiden')
+
     """
 
     # Initialize an array to hold the final cell type assignments

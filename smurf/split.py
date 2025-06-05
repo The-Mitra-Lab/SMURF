@@ -572,9 +572,8 @@ def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
     :rtype: numpy.ndarray
 
     :example:
-        ```python
-        weight_to_celltype = calculate_weight_to_celltype(adatas_final, adata, cells_final, so)
-        ```
+    >>> weight_to_celltype = calculate_weight_to_celltype(adatas_final, adata, cells_final, so)
+
     """
 
     cell_ids = list(adatas_final.obs.index.astype(float))
