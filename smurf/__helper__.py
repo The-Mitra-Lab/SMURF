@@ -866,9 +866,8 @@ def plot_cellcluster_position(cell_cluster_final, col_num=5):
     :rtype: None
 
     :example:
-        .. code-block:: python
-            # Assuming 'cell_cluster_final' is your cluster label array
-            plot_cellcluster_position(cell_cluster_final, col_num=4)
+     >>> # Assuming 'cell_cluster_final' is your cluster label array
+     >>> plot_cellcluster_position(cell_cluster_final, col_num=4)
 
     """
 
