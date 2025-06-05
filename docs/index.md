@@ -4,9 +4,7 @@ Welcome to **SMURF**!
 
 SMURF performs soft segmentation of [VisiumHD](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression) data, facilitating the creation of a `cells*genes` `anndata` object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation and then assigns the transcripts recovered from each capture 'spot' to a nearby cell.
 
-SMURF was developed and maintained by [Juanru Guo](https://github.com/JuanruMaryGuo) and [The Mitra Lab](http://genetics.wustl.edu/rmlab/) at Washington University in St. Louis.
-
-If you find a model useful for your research, please cite the following (paper on the way):
+If you find a model useful for your research, please cite the following:
 
 ```
 @article{guo2025smurf,
