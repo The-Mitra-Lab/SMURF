@@ -40,5 +40,5 @@ pip install git+https://github.com/The-Mitra-Lab/SMURF.git
 or
 
 ```bash
-pip install git+https://github.com/The-Mitra-Lab/SMURF[full].git
+pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=pysmurf[full]"
 ```
