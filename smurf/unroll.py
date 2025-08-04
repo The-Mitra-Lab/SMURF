@@ -226,8 +226,8 @@ def clean_select(
         label="Saved",
         markersize=2,
     )
-    plt.xlabel("X")
-    plt.ylabel("Y")
+    plt.xlabel("Array_row")
+    plt.ylabel("Array_col")
     plt.legend()
 
     # Keep only the points that are neither in the mask nor outliers, or are in the save area
@@ -251,7 +251,7 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
     Selects cells from an AnnData object based on cluster labels and retrieves their spatial coordinates.
 
     This function selects cells belonging to specified cluster(s) from the provided AnnData object and extracts
-    their spatial coordinates. The spatial coordinates are retrieved either from `adata.obs['x']` and `adata.obs['y']`,
+    their spatial coordinates. The spatial coordinates are retrieved either from `adata.obs['array_row']` and `adata.obs['array_col']`,
     or from a provided spatial object `so` containing `cell_centers`.
 
     :param adata:
@@ -267,7 +267,7 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
     :type cluster_name: str, optional
 
     :param so:
-        A spatial object containing spatial data, including `cell_centers`. If 'x' and 'y' coordinates are not available
+        A spatial object containing spatial data, including `cell_centers`. If 'array_row' and 'array_col' coordinates are not available
         in `adata.obs`, this parameter is used to retrieve positions. Defaults to `None`.
     :type so: spatial_object, optional
 
@@ -281,8 +281,8 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
 
     index = np.array(adata[adata.obs[cluster_name].isin(cluster)].obs.index)
 
-    if "x" in adata.obs.columns and "y" in adata.obs.columns:
-        xys = np.array(adata[index, :].obs[["x", "y"]])
+    if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
+        xys = np.array(adata[index, :].obs[["array_row", "array_col"]])
     elif so is not None:
         xys = []
         for cell_id in index:
@@ -291,7 +291,7 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
         xys = np.array(xys)
     else:
         raise ValueError(
-            "Please input either 'so' or ensure 'x' and 'y' are in 'adata.obs'"
+            "Please input either 'so' or ensure 'array_row' and 'array_col' are in 'adata.obs'"
         )
 
     return index, xys
@@ -403,8 +403,8 @@ def x_axis(
         (interp_x(even_distances), interp_y(even_distances)), axis=-1
     )
 
-    if "x" in adata.obs.columns and "y" in adata.obs.columns:
-        xyss = np.array(adata.obs[["x", "y"]])
+    if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
+        xyss = np.array(adata.obs[["array_row", "array_col"]])
     elif so is not None:
         xyss = []
         #  cell_ids_rest = []
@@ -417,7 +417,7 @@ def x_axis(
     # cell_ids_rest = np.array(cell_ids_rest)
     else:
         raise ValueError(
-            "Please input either 'so' or ensure 'x' and 'y' are in 'adata.obs'"
+            "Please input either 'so' or ensure 'array_row' and 'array_col' are in 'adata.obs'"
         )
 
     ratio = (selected[1][:, 0].max() - selected[1][:, 0].min()) / (
@@ -431,8 +431,8 @@ def x_axis(
         X[:, 0], X[:, 1], c=sort_index(color), cmap=plt.cm.Spectral, s=0.5
     )
     axs[0].set_title("Original Swiss Roll")
-    axs[0].set_xlabel("X")
-    axs[0].set_ylabel("Y")
+    axs[0].set_xlabel("Array_row")
+    axs[0].set_ylabel("Array_col")
     cbar = plt.colorbar(c, ax=axs[0], orientation="vertical")
     cbar.set_label("Color Scale")
 
@@ -469,8 +469,8 @@ def x_axis(
         markersize=0.5,
     )
     axs[3].set_title("Unwrapping Mouse Brain")
-    axs[3].set_xlabel("X")
-    axs[3].set_ylabel("Y")
+    axs[3].set_xlabel("Array_row")
+    axs[3].set_ylabel("Array_col")
     axs[3].legend()
 
     plt.tight_layout()
@@ -513,8 +513,8 @@ def plot_selected(selected):
 
     # Set title and labels correctly
     plt.title("Your data")
-    plt.xlabel("X")
-    plt.ylabel("Y")
+    plt.xlabel("Array_row")
+    plt.ylabel("Array_col")
 
     # Show the plot
     plt.show()
@@ -575,8 +575,8 @@ def y_axis(
         A pandas DataFrame `final_results` containing the following columns:
 
         - 'cell_id': Cell IDs.
-        - 'x': Original x-coordinate of the cell.
-        - 'y': Original y-coordinate of the cell.
+        - 'array_row': Original x-coordinate of the cell.
+        - 'array_col': Original y-coordinate of the cell.
         - 'x_flattened': Index of the nearest point on the x-axis.
         - 'y_flattened': Scaled distance from the cell to the nearest point on the x-axis.
 
@@ -596,12 +596,12 @@ def y_axis(
     # Create a DataFrame to store final results
     final_results = pd.DataFrame(
         999999 * np.ones([cells[1].shape[0], 5]),
-        columns=["cell_id", "x", "y", "x_flattened", "y_flattened"],
+        columns=["cell_id", "array_row", "array_col", "x_flattened", "y_flattened"],
     )
     #  final_results['data_total_id'] = list(range(cells_before, data_total.shape[0]))
     final_results["cell_id"] = cells[0]
-    final_results["x"] = cells[1][:, 0]
-    final_results["y"] = cells[1][:, 1]
+    final_results["array_row"] = cells[1][:, 0]
+    final_results["array_col"] = cells[1][:, 1]
     final_results["x_flattened"] = indices.flatten()
     final_results["y_flattened"] = distances.flatten()
     final_results["y_flattened"] = resolution * final_results["y_flattened"] / unit
@@ -620,12 +620,18 @@ def y_axis(
 
             final_results2 = pd.DataFrame(
                 999999 * np.zeros([len(selected[0]), 5]),
-                columns=["cell_id", "x", "y", "x_flattened", "y_flattened"],
+                columns=[
+                    "cell_id",
+                    "array_row",
+                    "array_col",
+                    "x_flattened",
+                    "y_flattened",
+                ],
             )
             #     final_results2['data_total_id'] = list(range(len(selected[0])))
             final_results2["cell_id"] = selected[0]
-            final_results2["x"] = selected[1][:, 0]
-            final_results2["y"] = selected[1][:, 1]
+            final_results2["array_row"] = selected[1][:, 0]
+            final_results2["array_col"] = selected[1][:, 1]
             final_results2["x_flattened"] = indices.flatten()
             final_results2["y_flattened"] = 0
 
@@ -657,8 +663,8 @@ def y_axis(
 
     # --- First Scatter Plot on ax1 ---
     scatter_final_ax1 = ax1.scatter(
-        final_results["x"],
-        final_results["y"],
+        final_results["array_row"],
+        final_results["array_col"],
         c=final_results["x_flattened"],
         cmap="Spectral",
         s=0.5,
@@ -678,8 +684,8 @@ def y_axis(
 
     # Set title and labels for the first subplot
     ax1.set_title("Original Swiss Roll - X Flattened")
-    ax1.set_xlabel("X")
-    ax1.set_ylabel("Y")
+    ax1.set_xlabel("Array_row")
+    ax1.set_ylabel("Array_col")
 
     # Add a colorbar for the first scatter plot
     cbar1 = plt.colorbar(scatter_final_ax1, ax=ax1)
@@ -690,8 +696,8 @@ def y_axis(
 
     # --- Second Scatter Plot on ax2 ---
     scatter_final_ax2 = ax2.scatter(
-        final_results["x"],
-        final_results["y"],
+        final_results["array_row"],
+        final_results["array_col"],
         c=final_results["y_flattened"],
         cmap="Spectral",
         s=0.5,
@@ -700,8 +706,8 @@ def y_axis(
 
     # Set title and labels for the second subplot
     ax2.set_title("Original Swiss Roll - Y Flattened")
-    ax2.set_xlabel("X")
-    ax2.set_ylabel("Y")
+    ax2.set_xlabel("Array_row")
+    ax2.set_ylabel("Array_col")
 
     # Add a colorbar for the second scatter plot
     cbar2 = plt.colorbar(scatter_final_ax2, ax=ax2)
@@ -721,7 +727,7 @@ def y_axis(
 
 
 def check_cos_angle(row, center, x_axis_results):
-    x, y = row["x"], row["y"]
+    x, y = row["array_row"], row["array_col"]
     idx = int(row["x_flattened"])
 
     v1 = np.array([x - center[0], y - center[1]])
@@ -794,8 +800,8 @@ def x_axis_pre(
         X[:, 0], X[:, 1], c=sort_index(color), cmap=plt.cm.Spectral, s=0.5
     )
     ax.set_title("Original Swiss Roll")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
+    ax.set_xlabel("Array_row")
+    ax.set_ylabel("Array_col")
 
     cbar = plt.colorbar(scatter, ax=ax, orientation="vertical")
     cbar.set_label("Color Scale")
@@ -832,7 +838,7 @@ def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
     :type delete_xaxis: list or tuple of arrays, optional
 
     :param so:
-        (Optional) A spatial object containing spatial data, including `cell_centers`. Used to obtain positions if 'x' and 'y' are not in `adata.obs`. Defaults to `None`.
+        (Optional) A spatial object containing spatial data, including `cell_centers`. Used to obtain positions if 'array_row' and 'array_col' are not in `adata.obs`. Defaults to `None`.
     :type so: spatial_object, optional
 
     :return:
@@ -859,15 +865,15 @@ def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
     if exclude_indices:
         index = index.difference(exclude_indices)
 
-    # Proceed to extract 'x' and 'y' coordinates
-    if "x" in adata.obs.columns and "y" in adata.obs.columns:
+    # Proceed to extract 'array_row' and 'array_col' coordinates
+    if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
         # Use pandas loc for efficient selection
-        xys = adata.obs.loc[index, ["x", "y"]].values
+        xys = adata.obs.loc[index, ["array_row", "array_col"]].values
     elif so is not None:
         # Convert so.cell_centers to a DataFrame if it's a dictionary
         if isinstance(so.cell_centers, dict):
             so_centers_df = pd.DataFrame.from_dict(
-                so.cell_centers, orient="index", columns=["x", "y"]
+                so.cell_centers, orient="index", columns=["array_row", "array_col"]
             )
         else:
             # Assume so.cell_centers is already a DataFrame or Series
@@ -880,7 +886,7 @@ def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
         xys = so_centers_df.loc[index].values
     else:
         raise ValueError(
-            "Please input either 'so' or ensure 'x' and 'y' are in 'adata.obs'"
+            "Please input either 'so' or ensure 'array_row' and 'array_col' are in 'adata.obs'"
         )
 
     # Return indices as a NumPy array
@@ -972,8 +978,8 @@ def y_axis_circle(
         A pandas DataFrame `final_result` containing the following columns:
 
         - 'cell_id': Cell IDs.
-        - 'x': Original x-coordinate of the cell.
-        - 'y': Original y-coordinate of the cell.
+        - 'array_row': Original x-coordinate of the cell.
+        - 'array_col': Original y-coordinate of the cell.
         - 'x_flattened': Index of the nearest point on the x-axis.
         - 'y_flattened': Scaled cumulative distance representing the layer.
         - 'layer': Assigned layer number.
@@ -997,18 +1003,17 @@ def y_axis_circle(
         columns=[
             "data_total_id",
             "cell_id",
-            "x",
-            "y",
+            "array_row",
+            "array_col",
             "x_flattened",
             "y_flattened",
             "layer",
         ],
     )
-    # final_results = pd.DataFrame(999999* np.ones([xys_final.shape[0],6]), columns=['cell_id','x','y','x_flattened','y_flattened','layer'])
     final_results["data_total_id"] = list(range(cells_before, data_total.shape[0]))
     final_results["cell_id"] = rest_cells
-    final_results["x"] = xys_final[:, 0]
-    final_results["y"] = xys_final[:, 1]
+    final_results["array_row"] = xys_final[:, 0]
+    final_results["array_col"] = xys_final[:, 1]
     final_results = final_results.set_index("data_total_id")
 
     layers = {}
@@ -1138,8 +1143,8 @@ def y_axis_circle(
         columns=[
             "data_total_id",
             "cell_id",
-            "x",
-            "y",
+            "array_row",
+            "array_col",
             "x_flattened",
             "y_flattened",
             "layer",
@@ -1147,8 +1152,8 @@ def y_axis_circle(
     )
     final_results2["data_total_id"] = list(range(len(selected[0])))
     final_results2["cell_id"] = selected[0]
-    final_results2["x"] = ids_final[:, 0]
-    final_results2["y"] = ids_final[:, 1]
+    final_results2["array_row"] = ids_final[:, 0]
+    final_results2["array_col"] = ids_final[:, 1]
     final_results2["x_flattened"] = ids_final[:, 2]
     final_results2["y_flattened"] = ids_final[:, 3]
     final_results2["layer"] = 0
@@ -1172,8 +1177,8 @@ def y_axis_circle(
 
     # First subplot
     scatter1 = axs[0].scatter(
-        final_result["x"],
-        final_result["y"],
+        final_result["array_row"],
+        final_result["array_col"],
         c=final_result["x_flattened"],
         cmap=plt.cm.Spectral,
         s=0.5,
@@ -1191,38 +1196,38 @@ def y_axis_circle(
     )
 
     axs[0].set_title("Original Swiss Roll (X color)")
-    axs[0].set_xlabel("X")
-    axs[0].set_ylabel("Y")
+    axs[0].set_xlabel("Array_row")
+    axs[0].set_ylabel("Array_col")
     # Add a color bar to the first subplot
     cbar1 = fig.colorbar(scatter1, ax=axs[0])
     cbar1.set_label("Color scale")
 
     # Second subplot
     scatter2 = axs[1].scatter(
-        final_result["x"],
-        final_result["y"],
+        final_result["array_row"],
+        final_result["array_col"],
         c=final_result["y_flattened"],
         cmap=plt.cm.Spectral,
         s=0.5,
     )
     axs[1].set_title("Original Swiss Roll (Y color)")
-    axs[1].set_xlabel("X")
-    axs[1].set_ylabel("Y")
+    axs[1].set_xlabel("Array_row")
+    axs[1].set_ylabel("Array_col")
     # Add a color bar to the second subplot
     cbar2 = fig.colorbar(scatter2, ax=axs[1])
     cbar2.set_label("Color scale")
 
     # Third subplot
     scatter3 = axs[2].scatter(
-        final_result["x"],
-        final_result["y"],
+        final_result["array_row"],
+        final_result["array_col"],
         c=final_result["layer"],
         cmap=plt.cm.Spectral,
         s=0.5,
     )
     axs[2].set_title("Original Swiss Roll (Layer color)")
-    axs[2].set_xlabel("X")
-    axs[2].set_ylabel("Y")
+    axs[2].set_xlabel("Array_row")
+    axs[2].set_ylabel("Array_col")
     # Add a color bar to the third subplot
     cbar3 = fig.colorbar(scatter3, ax=axs[2])
     cbar3.set_label("layer")
@@ -1241,7 +1246,7 @@ def plot_final_result(final_result):
     This function creates visualizations of the unwrapped spatial data, using the 'x_flattened' and 'y_flattened' values from the `final_result` DataFrame. It helps in analyzing and interpreting the results of the unwrapping process.
 
     :param final_result:
-        A pandas DataFrame containing the final results of the spatial unwrapping, with columns such as 'cell_id', 'x', 'y', 'x_flattened', 'y_flattened', and possibly 'layer'.
+        A pandas DataFrame containing the final results of the spatial unwrapping, with columns such as 'cell_id', 'array_row', 'array_col', 'x_flattened', 'y_flattened', and possibly 'layer'.
     :type final_result: pandas.DataFrame
 
     :return:
@@ -1257,45 +1262,45 @@ def plot_final_result(final_result):
 
         # First subplot
         scatter1 = axs[0].scatter(
-            final_result["x"],
-            final_result["y"],
+            final_result["array_row"],
+            final_result["array_col"],
             c=final_result["x_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[0].set_title("Original Swiss Roll (X color)")
-        axs[0].set_xlabel("X")
-        axs[0].set_ylabel("Y")
+        axs[0].set_xlabel("Array_row")
+        axs[0].set_ylabel("Array_col")
         # Add a color bar to the first subplot
         cbar1 = fig.colorbar(scatter1, ax=axs[0])
         cbar1.set_label("Color scale")
 
         # Second subplot
         scatter2 = axs[1].scatter(
-            final_result["x"],
-            final_result["y"],
+            final_result["array_row"],
+            final_result["array_col"],
             c=final_result["y_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[1].set_title("Original Swiss Roll (Y color)")
-        axs[1].set_xlabel("X")
-        axs[1].set_ylabel("Y")
+        axs[1].set_xlabel("Array_row")
+        axs[1].set_ylabel("Array_col")
         # Add a color bar to the second subplot
         cbar2 = fig.colorbar(scatter2, ax=axs[1])
         cbar2.set_label("Color scale")
 
         # Third subplot
         scatter3 = axs[2].scatter(
-            final_result["x"],
-            final_result["y"],
+            final_result["array_row"],
+            final_result["array_col"],
             c=final_result["layer"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[2].set_title("Original Swiss Roll (Layer color)")
-        axs[2].set_xlabel("X")
-        axs[2].set_ylabel("Y")
+        axs[2].set_xlabel("Array_row")
+        axs[2].set_ylabel("Array_col")
         # Add a color bar to the third subplot
         cbar3 = fig.colorbar(scatter3, ax=axs[2])
         cbar3.set_label("layer")
@@ -1310,30 +1315,30 @@ def plot_final_result(final_result):
 
         # First subplot
         scatter1 = axs[0].scatter(
-            final_result["x"],
-            final_result["y"],
+            final_result["array_row"],
+            final_result["array_col"],
             c=final_result["x_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[0].set_title("Original Swiss Roll (X color)")
-        axs[0].set_xlabel("X")
-        axs[0].set_ylabel("Y")
+        axs[0].set_xlabel("Array_row")
+        axs[0].set_ylabel("Array_col")
         # Add a color bar to the first subplot
         cbar1 = fig.colorbar(scatter1, ax=axs[0])
         cbar1.set_label("Color scale")
 
         # Second subplot
         scatter2 = axs[1].scatter(
-            final_result["x"],
-            final_result["y"],
+            final_result["array_row"],
+            final_result["array_col"],
             c=final_result["y_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[1].set_title("Original Swiss Roll (Y color)")
-        axs[1].set_xlabel("X")
-        axs[1].set_ylabel("Y")
+        axs[1].set_xlabel("Array_row")
+        axs[1].set_ylabel("Array_col")
         # Add a color bar to the second subplot
         cbar2 = fig.colorbar(scatter2, ax=axs[1])
         cbar2.set_label("Color scale")

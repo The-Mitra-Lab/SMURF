@@ -617,6 +617,8 @@ def get_finaldata(
     nonzero_indices_toml=None,
     cells_before_ml_x=None,
     so=None,
+    hi_scale=0.5,
+    low_scale=0.2,
 ):
 
     """
@@ -671,6 +673,14 @@ def get_finaldata(
     :param so:
         (Optional) A spatial object containing spatial mappings and data. If provided, spatial coordinates will be added to the final dataset.
     :type so: spatial_object, optional
+
+    :param hi_scale:
+        Resolution scale to a newly-created high-resolution image (0-1).
+    :type hi_scale: float
+
+    :param low_scale:
+        Resolution scale to a newly-created low-resolution image (0-1).
+    :type low_scale: float
 
     :return:
         An AnnData object containing the final single-cell gene expression data, along with cell metadata.
@@ -875,19 +885,54 @@ def get_finaldata(
             X=final_X.tocsr(),
             obs=pd.DataFrame(
                 cell_info,
-                columns=["cell_cluster", "cos_simularity", "cell_size", "x", "y"],
+                columns=[
+                    "cell_cluster",
+                    "cos_simularity",
+                    "cell_size",
+                    "array_row",
+                    "array_col",
+                ],
                 index=cell_index,
             ),
             var=adata.var,
         )
 
-    # adata_sc_final.X.eliminate_zeros()
+    sc.pp.filter_cells(adata_sc_final, min_counts=1)
+
+    pixels1 = getattr(so, "pixels_cells", None)
+
+    try:
+        adata_sc_final = prepare_visium_spatial_from_mask(
+            adata_sc_final,
+            so.pixels_cells,
+            so.image_temp(),
+            hi_scale=hi_scale,
+            low_scale=low_scale,
+            lib_id="SMURF",
+        )
+    except:
+        adata_sc_final = prepare_visium_spatial_from_mask(
+            adata_sc_final,
+            so.segmentation_final,
+            so.image_temp(),
+            hi_scale=hi_scale,
+            low_scale=low_scale,
+            lib_id="SMURF",
+        )
 
     return adata_sc_final
 
 
 def get_finaldata_fast(
-    cells_final, so, adatas_final, adata, weight_to_celltype, plot=True
+    cells_final,
+    so,
+    adatas_final,
+    adata,
+    weight_to_celltype,
+    *,
+    plot=True,
+    hi_scale=0.5,
+    low_scale=0.2,
 ):
 
     """
@@ -921,6 +966,14 @@ def get_finaldata_fast(
     :param plot:
         Whether to plot the cells on the spatial map after processing. Defaults to `True`. This may cost some time.
     :type plot: bool, optional
+
+    :param hi_scale:
+        Resolution scale to a newly-created high-resolution image (0-1).
+    :type hi_scale: float
+
+    :param low_scale:
+        Resolution scale to a newly-created low-resolution image (0-1).
+    :type low_scale: float
 
     :return:
         An AnnData object containing the final single-cell gene expression data, along with cell metadata.
@@ -1261,11 +1314,19 @@ def get_finaldata_fast(
         X=final_X.tocsr(),
         obs=pd.DataFrame(
             cell_info,
-            columns=["cell_cluster", "cos_simularity", "cell_size", "x", "y"],
+            columns=[
+                "cell_cluster",
+                "cos_simularity",
+                "cell_size",
+                "array_row",
+                "array_col",
+            ],
             index=cell_index,
         ),
         var=adata.var,
     )
+
+    sc.pp.filter_cells(adata_sc_final, min_counts=1)
 
     # Optionally plot the cells on the spatial map
     if plot:
@@ -1317,6 +1378,209 @@ def get_finaldata_fast(
                         )
                         new_matrix[i, j] = chosen_cell_id
 
+        try:
+            adata_sc_final = prepare_visium_spatial_from_mask(
+                adata_sc_final,
+                new_matrix,
+                so.image_temp(),
+                hi_scale=hi_scale,
+                low_scale=low_scale,
+                lib_id="SMURF",
+            )
+        except:
+            adata_sc_final = prepare_visium_spatial_from_mask(
+                adata_sc_final,
+                so.segmentation_final,
+                so.image_temp(),
+                hi_scale=hi_scale,
+                low_scale=low_scale,
+                lib_id="SMURF",
+            )
+
         so.pixels_cells = new_matrix
 
+    else:
+        adata_sc_final = prepare_visium_spatial_from_mask(
+            adata_sc_final,
+            so.segmentation_final,
+            so.image_temp(),
+            hi_scale=hi_scale,
+            low_scale=low_scale,
+            lib_id="SMURF",
+        )
+
     return adata_sc_final
+
+
+def compute_cell_centers(mask):
+
+    rows, cols = np.nonzero(mask)
+    ids = mask[rows, cols]
+
+    max_id = ids.max()
+    counts = np.bincount(ids, minlength=max_id + 1)
+    row_sum = np.bincount(ids, weights=rows, minlength=max_id + 1)
+    col_sum = np.bincount(ids, weights=cols, minlength=max_id + 1)
+
+    counts_fg = counts[1:]
+    valid = counts_fg > 0
+    cell_ids = np.nonzero(valid)[0] + 1
+
+    row_cent = row_sum[1:][valid] / counts_fg[valid]
+    col_cent = col_sum[1:][valid] / counts_fg[valid]
+
+    df_centers = pd.DataFrame(
+        {
+            "spatial1": col_cent.astype(np.float32),
+            "spatial2": row_cent.astype(np.float32),
+        },
+        index=cell_ids.astype(np.int32),
+    )
+    df_centers.index.name = "cell_id"
+
+    avg_radius_px = float(np.sqrt(counts_fg[valid].mean() / np.pi))
+    return df_centers, avg_radius_px
+
+
+def build_visium_style_spatial_flexible(
+    adata,
+    *,
+    coords_fullres,
+    img_in,
+    fullres_available=True,
+    hi_scale=0.5,
+    low_scale=0.2,
+    lib_id="SMURF",
+    spot_diameter_px=None,
+) -> None:
+
+    # helpers (_to_ndarray, _drop_alpha, _resize) identical to prior answer …
+    def _to_ndarray(img):
+        return img if isinstance(img, np.ndarray) else np.asarray(img)
+
+    def _drop_alpha(arr):
+        # keep RGB channel(s) only
+        return arr[..., :3] if arr.ndim == 3 and arr.shape[2] == 4 else arr
+
+    def _resize(arr: np.ndarray, scale: float) -> np.ndarray:
+
+        if scale >= 1.0:
+            return arr
+        h, w = arr.shape[:2]
+        new_wh = (int(round(w * scale)), int(round(h * scale)))
+
+        # ---------- 1) try OpenCV ----------
+        try:
+            import cv2
+
+            arr_cv = arr
+            if arr.dtype not in (np.uint8, np.uint16, np.float32):
+                # OpenCV can't handle int32/int64 → convert to uint8 (0-255)
+                arr_cv = np.clip(arr, 0, 255).astype(np.uint8, copy=False)
+
+            try:
+                return cv2.resize(arr_cv, new_wh, interpolation=cv2.INTER_AREA)
+            except cv2.error:
+                pass  # fallback to Pillow
+        except ModuleNotFoundError:
+            pass
+
+        # ---------- 2) try Pillow ----------
+        try:
+            from PIL import Image
+
+            arr_pil = arr
+            if arr.dtype not in (np.uint8, np.float32):
+                arr_pil = np.clip(arr, 0, 255).astype(np.uint8, copy=False)
+
+            pil_img = Image.fromarray(arr_pil)
+            return np.asarray(
+                pil_img.resize(
+                    new_wh, resample=Image.LANCZOS if scale < 1 else Image.BICUBIC
+                )
+            )
+        except Exception:  # Pillow missing *or* still can't handle the array
+            pass
+
+        # ---------- 3) pure NumPy stride ----------
+        stride = max(1, int(np.ceil(1 / scale)))
+        return (
+            arr[::stride, ::stride] if arr.ndim == 2 else arr[::stride, ::stride, ...]
+        )
+
+    coords_fullres = np.asarray(coords_fullres, dtype=float)
+    img_native = _drop_alpha(_to_ndarray(img_in))
+
+    if fullres_available:
+        img_full = img_native
+        img_hires = _resize(img_full, hi_scale)
+        img_low = _resize(img_full, low_scale)
+        hires_sf, low_sf = hi_scale, low_scale
+    else:
+        img_full = None
+        img_hires = img_native
+        img_low = _resize(img_hires, low_scale / hi_scale)
+        hires_sf, low_sf = hi_scale, low_scale
+
+    scalefactors = {
+        "spot_diameter_fullres": spot_diameter_px,
+        "tissue_hires_scalef": hires_sf,
+        "tissue_lowres_scalef": low_sf,
+        "tissue_fullres_scalef": 1.0,
+    }
+
+    adata.obsm["spatial"] = coords_fullres
+    img_block = {"hires": img_hires, "lowres": img_low}
+    if img_full is not None:
+        img_block["fullres"] = img_full
+
+    adata.uns.setdefault("spatial", {})
+    adata.uns["spatial"][lib_id] = {"images": img_block, "scalefactors": scalefactors}
+
+
+def prepare_visium_spatial_from_mask(
+    adata,
+    mask,
+    img_fullres,
+    *,
+    fullres_available=True,
+    hi_scale=0.5,
+    low_scale=0.2,
+    lib_id="SMURF",
+):
+    """
+    Compute cell centroids from a label mask, write them into AnnData,
+    and create a Visium-style spatial block.  Returns the modified AnnData.
+    """
+    # 1) centers & average radius
+    mask = mask.astype("int64")
+    centers_df, avg_radius_px = compute_cell_centers(mask)
+
+    # 2) align with adata.obs (assumes obs.index like "123.0")
+    obs_ids_int = adata.obs.index.astype(float).astype(int)
+    matched = obs_ids_int.isin(centers_df.index)
+
+    if matched.sum() == 0:
+        raise ValueError("No matching cell IDs found between AnnData and mask.")
+
+    coord_mat = np.full((adata.n_obs, 2), np.nan, dtype=np.float32)
+    coord_mat[matched] = centers_df.loc[
+        obs_ids_int[matched], ["spatial1", "spatial2"]
+    ].to_numpy()
+
+    adata.obsm["spatial"] = coord_mat
+
+    # 3) build spatial block (uses avg_radius_px internally)
+    valid_coords = coord_mat[matched]
+    build_visium_style_spatial_flexible(
+        adata=adata,
+        coords_fullres=valid_coords,
+        img_in=img_fullres,
+        fullres_available=fullres_available,
+        hi_scale=hi_scale,
+        low_scale=low_scale,
+        lib_id=lib_id,
+        spot_diameter_px=avg_radius_px,
+    )
+
+    return adata
