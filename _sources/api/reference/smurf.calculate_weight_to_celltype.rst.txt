@@ -1,0 +1,6 @@
+﻿smurf.calculate\_weight\_to\_celltype
+=====================================
+
+.. currentmodule:: smurf
+
+.. autofunction:: calculate_weight_to_celltype
