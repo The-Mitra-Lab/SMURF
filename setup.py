@@ -10,7 +10,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="pysmurf",
-    version="2.0.0",
+    version="2.0.1",
     author="Juanru Guo",
     author_email="g.juanru@wustl.edu",
     description="Segmentation and Manifold UnRolling Framework (SMURF)",
