@@ -2,6 +2,7 @@ import copy
 import os
 import pickle
 import warnings
+from pathlib import Path
 
 import anndata
 import matplotlib.patches as patches
@@ -28,6 +29,24 @@ def fill_pixels(pixels, row_starts, row_ends, col_starts, col_ends, indices):
         pixels[row_starts[i] : row_ends[i], col_starts[i] : col_ends[i]] = indices[i]
 
     return pixels
+
+
+def load_table(df_path, **read_kwargs):
+    """
+    Load a table from CSV/TSV (optionally gzipped) or Parquet based on the path.
+    Extra kwargs are passed to pandas readers.
+    """
+    p = Path(df_path)
+    suf = "".join(p.suffixes).lower()  # e.g., ".csv.gz", ".parquet"
+
+    if suf.endswith((".parquet", ".parq")):
+        return pd.read_parquet(p, engine="pyarrow", **read_kwargs)
+
+    if suf.endswith((".csv", ".csv.gz", ".tsv", ".tsv.gz", ".txt", ".txt.gz")):
+        sep = "\t" if (".tsv" in suf) else ","
+        return pd.read_csv(p, sep=sep, **read_kwargs, header=0)
+
+    raise ValueError(f"Unsupported file type for: {p.name}")
 
 
 def prepare_dataframe_image(
@@ -94,7 +113,7 @@ def prepare_dataframe_image(
         print(f"Error opening or processing image: {e}")
 
     # Read the Parquet file into a DataFrame
-    df = pd.read_parquet(df_path, engine="pyarrow")
+    df = load_table(df_path)
 
     # Calculate the average row and column sizes
     avg_row = (df["pxl_row_in_fullres"].max() - df["pxl_row_in_fullres"].min()) / (
@@ -506,7 +525,14 @@ def singlecellanalysis(
 
 
 def expanding_cells(
-    so, adata_sc, weights, iter_cells, data_temp, min_percent=0.4, cortex=False
+    so,
+    adata_sc,
+    weights,
+    iter_cells,
+    data_temp,
+    min_percent=0.4,
+    cortex=False,
+    allow_equal=False,
 ):
 
     """
@@ -547,6 +573,10 @@ def expanding_cells(
         If `True`, performs additional processing suitable for cortical data using Delaunay triangulation
         to fill in cell regions. Defaults to `False`.
     :type cortex: bool, optional
+
+    :param allow_equal:
+        If `True`, allows inclusion of neighboring spots that maintain the same score (>=).
+        If `False`, only includes spots that improve the score (>). Defaults to `False`.
 
     :return:
         A tuple containing:
@@ -591,125 +621,248 @@ def expanding_cells(
 
         return point_set
 
-    for i_num in tqdm.tqdm(range(total_num)):
+    if allow_equal:
+        for i_num in tqdm.tqdm(range(total_num)):
 
-        cell_id = cell_ids[i_num]
-        cell_type = celltypes[i_num]
+            cell_id = cell_ids[i_num]
+            cell_type = celltypes[i_num]
 
-        # Get the initial sets and cell matrix
-        set_cell = copy.deepcopy(so.set_cells[cell_id])
-        set_tobe = copy.deepcopy(so.set_tobes[cell_id])
-        set_exclude = copy.deepcopy(so.set_excludes[cell_id])
-        cell_matrix = copy.deepcopy(so.cell_matrix[cell_id])
+            # Get the initial sets and cell matrix
+            set_cell = copy.deepcopy(so.set_cells[cell_id])
+            set_tobe = copy.deepcopy(so.set_tobes[cell_id])
+            set_exclude = copy.deepcopy(so.set_excludes[cell_id])
+            cell_matrix = copy.deepcopy(so.cell_matrix[cell_id])
 
-        # Calculate the initial score
-        score = (np.dot(cell_matrix, weights[cell_type]) / norm(cell_matrix))[0, 0]
-        tobe_considered = set_tobe - set_cell - set_exclude
-        i = 0
-
-        # Begin expanding the cell region
-        while len(tobe_considered) != 0:
-            for row, col in tobe_considered:
-                cell_matrix_temp = (
-                    data_temp[so.set_toindex_data[(row, col)], :] + cell_matrix
-                )
-
-                score_temp = (
-                    np.dot(cell_matrix_temp, weights[cell_type])
-                    / norm(cell_matrix_temp)
-                )[0, 0]
-
-                if score_temp > score:
-
-                    # If the score improves, update the cell region
-                    set_cell.update([(row, col)])
-                    cell_matrix = cell_matrix_temp
-
-                    # Check neighboring spots and update set_tobe or set_exclude
-                    if (
-                        row - 1 >= so.start_row_spot
-                        and (row - 1, col) in so.set_toindex_data
-                    ):
-                        spot = so.df.index[so.set_toindex[(row - 1, col)]]
-                        if 0 in so.spots[spot]:
-                            if (
-                                so.spots[spot][0] / sum(so.spots[spot].values())
-                                >= min_percent
-                            ):
-                                set_tobe.update([(row - 1, col)])
-                        else:
-                            set_exclude.add((row - 1, col))
-                            set_exclude.add((row - 2, col))
-                            set_exclude.add((row - 1, col + 1))
-                            set_exclude.add((row - 1, col - 1))
-
-                    if (
-                        row + 1 < so.end_row_spot
-                        and (row + 1, col) in so.set_toindex_data
-                    ):
-                        so.spot = so.df.index[so.set_toindex[(row + 1, col)]]
-                        if 0 in so.spots[spot]:
-                            if (
-                                so.spots[spot][0] / sum(so.spots[spot].values())
-                                >= min_percent
-                            ):
-                                set_tobe.update([(row + 1, col)])
-                        else:
-                            set_exclude.add((row + 1, col))
-                            set_exclude.add((row + 2, col))
-                            set_exclude.add((row + 1, col + 1))
-                            set_exclude.add((row + 1, col - 1))
-
-                    if (
-                        col - 1 >= so.start_col_spot
-                        and (row, col - 1) in so.set_toindex_data
-                    ):
-                        spot = so.df.index[so.set_toindex[(row, col - 1)]]
-                        if 0 in so.spots[spot]:
-                            if (
-                                so.spots[spot][0] / sum(so.spots[spot].values())
-                                >= min_percent
-                            ):
-                                set_tobe.update([(row, col - 1)])
-                        else:
-                            set_exclude.add((row, col - 1))
-                            set_exclude.add((row, col - 2))
-                            set_exclude.add((row + 1, col - 1))
-                            set_exclude.add((row - 1, col - 1))
-
-                    if (
-                        col + 1 < so.end_col_spot
-                        and (row, col + 1) in so.set_toindex_data
-                    ):
-                        so.spot = so.df.index[so.set_toindex[(row, col + 1)]]
-                        if 0 in so.spots[spot]:
-                            if (
-                                so.spots[spot][0] / sum(so.spots[spot].values())
-                                >= min_percent
-                            ):
-                                set_tobe.update([(row, col + 1)])
-                        else:
-                            set_exclude.add((row, col + 1))
-                            set_exclude.add((row, col + 2))
-                            set_exclude.add((row + 1, col + 1))
-                            set_exclude.add((row - 1, col + 1))
-
-                    cell_matrix = cell_matrix_temp
-                    score = score_temp
-
-                else:
-                    set_exclude.update([(row, col)])
-
+            # Calculate the initial score
+            score = (np.dot(cell_matrix, weights[cell_type]) / norm(cell_matrix))[0, 0]
             tobe_considered = set_tobe - set_cell - set_exclude
-            i = i + 1
+            i = 0
 
-            if i >= iter_cells[cell_id]:
-                break
+            # Begin expanding the cell region
+            while len(tobe_considered) != 0:
+                for row, col in tobe_considered:
+                    cell_matrix_temp = (
+                        data_temp[so.set_toindex_data[(row, col)], :] + cell_matrix
+                    )
 
-        cells_final[cell_id] = copy.deepcopy(set_cell)
-        length_final[i_num] = len(set_cell)
-        cellscore[i_num] = score
-        final_data[i_num] = copy.deepcopy(cell_matrix)
+                    score_temp = (
+                        np.dot(cell_matrix_temp, weights[cell_type])
+                        / norm(cell_matrix_temp)
+                    )[0, 0]
+
+                    if score_temp >= score:
+
+                        # If the score improves, update the cell region
+                        set_cell.update([(row, col)])
+                        cell_matrix = cell_matrix_temp
+
+                        # Check neighboring spots and update set_tobe or set_exclude
+                        if (
+                            row - 1 >= so.start_row_spot
+                            and (row - 1, col) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row - 1, col)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row - 1, col)])
+                            else:
+                                set_exclude.add((row - 1, col))
+                                set_exclude.add((row - 2, col))
+                                set_exclude.add((row - 1, col + 1))
+                                set_exclude.add((row - 1, col - 1))
+
+                        if (
+                            row + 1 < so.end_row_spot
+                            and (row + 1, col) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row + 1, col)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row + 1, col)])
+                            else:
+                                set_exclude.add((row + 1, col))
+                                set_exclude.add((row + 2, col))
+                                set_exclude.add((row + 1, col + 1))
+                                set_exclude.add((row + 1, col - 1))
+
+                        if (
+                            col - 1 >= so.start_col_spot
+                            and (row, col - 1) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row, col - 1)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row, col - 1)])
+                            else:
+                                set_exclude.add((row, col - 1))
+                                set_exclude.add((row, col - 2))
+                                set_exclude.add((row + 1, col - 1))
+                                set_exclude.add((row - 1, col - 1))
+
+                        if (
+                            col + 1 < so.end_col_spot
+                            and (row, col + 1) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row, col + 1)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row, col + 1)])
+                            else:
+                                set_exclude.add((row, col + 1))
+                                set_exclude.add((row, col + 2))
+                                set_exclude.add((row + 1, col + 1))
+                                set_exclude.add((row - 1, col + 1))
+
+                        cell_matrix = cell_matrix_temp
+                        score = score_temp
+
+                    else:
+                        set_exclude.update([(row, col)])
+
+                tobe_considered = set_tobe - set_cell - set_exclude
+                i = i + 1
+
+                if i >= iter_cells[cell_id]:
+                    break
+
+            cells_final[cell_id] = copy.deepcopy(set_cell)
+            length_final[i_num] = len(set_cell)
+            cellscore[i_num] = score
+            final_data[i_num] = copy.deepcopy(cell_matrix)
+
+    else:
+
+        for i_num in tqdm.tqdm(range(total_num)):
+
+            cell_id = cell_ids[i_num]
+            cell_type = celltypes[i_num]
+
+            # Get the initial sets and cell matrix
+            set_cell = copy.deepcopy(so.set_cells[cell_id])
+            set_tobe = copy.deepcopy(so.set_tobes[cell_id])
+            set_exclude = copy.deepcopy(so.set_excludes[cell_id])
+            cell_matrix = copy.deepcopy(so.cell_matrix[cell_id])
+
+            # Calculate the initial score
+            score = (np.dot(cell_matrix, weights[cell_type]) / norm(cell_matrix))[0, 0]
+            tobe_considered = set_tobe - set_cell - set_exclude
+            i = 0
+
+            # Begin expanding the cell region
+            while len(tobe_considered) != 0:
+                for row, col in tobe_considered:
+                    cell_matrix_temp = (
+                        data_temp[so.set_toindex_data[(row, col)], :] + cell_matrix
+                    )
+
+                    score_temp = (
+                        np.dot(cell_matrix_temp, weights[cell_type])
+                        / norm(cell_matrix_temp)
+                    )[0, 0]
+
+                    if score_temp > score:
+
+                        # If the score improves, update the cell region
+                        set_cell.update([(row, col)])
+                        cell_matrix = cell_matrix_temp
+
+                        # Check neighboring spots and update set_tobe or set_exclude
+                        if (
+                            row - 1 >= so.start_row_spot
+                            and (row - 1, col) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row - 1, col)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row - 1, col)])
+                            else:
+                                set_exclude.add((row - 1, col))
+                                set_exclude.add((row - 2, col))
+                                set_exclude.add((row - 1, col + 1))
+                                set_exclude.add((row - 1, col - 1))
+
+                        if (
+                            row + 1 < so.end_row_spot
+                            and (row + 1, col) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row + 1, col)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row + 1, col)])
+                            else:
+                                set_exclude.add((row + 1, col))
+                                set_exclude.add((row + 2, col))
+                                set_exclude.add((row + 1, col + 1))
+                                set_exclude.add((row + 1, col - 1))
+
+                        if (
+                            col - 1 >= so.start_col_spot
+                            and (row, col - 1) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row, col - 1)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row, col - 1)])
+                            else:
+                                set_exclude.add((row, col - 1))
+                                set_exclude.add((row, col - 2))
+                                set_exclude.add((row + 1, col - 1))
+                                set_exclude.add((row - 1, col - 1))
+
+                        if (
+                            col + 1 < so.end_col_spot
+                            and (row, col + 1) in so.set_toindex_data
+                        ):
+                            spot = so.df.index[so.set_toindex[(row, col + 1)]]
+                            if 0 in so.spots[spot]:
+                                if (
+                                    so.spots[spot][0] / sum(so.spots[spot].values())
+                                    >= min_percent
+                                ):
+                                    set_tobe.update([(row, col + 1)])
+                            else:
+                                set_exclude.add((row, col + 1))
+                                set_exclude.add((row, col + 2))
+                                set_exclude.add((row + 1, col + 1))
+                                set_exclude.add((row - 1, col + 1))
+
+                        cell_matrix = cell_matrix_temp
+                        score = score_temp
+
+                    else:
+                        set_exclude.update([(row, col)])
+
+                tobe_considered = set_tobe - set_cell - set_exclude
+                i = i + 1
+
+                if i >= iter_cells[cell_id]:
+                    break
+
+            cells_final[cell_id] = copy.deepcopy(set_cell)
+            length_final[i_num] = len(set_cell)
+            cellscore[i_num] = score
+            final_data[i_num] = copy.deepcopy(cell_matrix)
 
     # make results cortex
     if cortex:
@@ -923,6 +1076,10 @@ def itering_arragement(
     save_folder="results_example/",
     show=True,
     keep_previous=False,
+    max_distance=2,
+    allow_equal=False,
+    max_iter=30,
+    stop_iter=2,
 ):
 
     """
@@ -971,6 +1128,25 @@ def itering_arragement(
         Defaults to `False`.
     :type keep_previous: bool, optional
 
+    :param max_distance:
+        The maximum distance (in terms of iterations) allowed for expanding each cell during the arrangement process.
+        Defaults to `2`.
+    :type max_distance: int, optional
+
+    :param max_iter:
+        The maximum number of iterations to perform for cell arrangement. Defaults to `30`.
+    :type max_iter: int, optional
+
+    :param stop_iter:
+        The number of consecutive iterations without improvement in mutual information score before stopping the process.
+        Defaults to `2`.
+    :type stop_iter: int, optional
+
+    :param allow_equal:
+        If `True`, allows inclusion of neighboring spots that maintain the same score (>=) during cell expansion.
+        If `False`, only includes spots that improve the score (>). Defaults to `False`.
+    :type allow_equal: bool, optional
+
     :return:
         None. The function saves intermediate and final results to the specified folder.
     :rtype: None
@@ -996,8 +1172,6 @@ def itering_arragement(
     weights = weights / norm(weights, axis=1).reshape(-1, 1)
     weights_record[0] = weights
 
-    mi_0 = 0
-    adatas = {}
     adata_temp = adata_sc
     mis = [0]
 
@@ -1017,13 +1191,13 @@ def itering_arragement(
         if re[i] < 0:
             iter_cells[cell_id] = 1
         else:
-            iter_cells[cell_id] = 2
+            iter_cells[cell_id] = max_distance
 
     max_mi = 0
     max_mi_i = 0
 
     # Begin iterative arrangement
-    for i in range(1, 30):
+    for i in range(1, max_iter):
 
         # Expand cells and update data
         cells_final, final_data, cellscore, length_final = expanding_cells(
@@ -1034,6 +1208,7 @@ def itering_arragement(
             data_temp=csr_matrix(adata.X),
             min_percent=0.4,
             cortex=False,
+            allow_equal=allow_equal,
         )
         adata_temp = anndata.AnnData(
             X=csr_matrix(final_data),
@@ -1062,7 +1237,7 @@ def itering_arragement(
 
         if show:
             print(mi, i)
-        if (i > max_mi_i + 1) and max_mi > mi:
+        if (i > max_mi_i + stop_iter - 1) and max_mi > mi:
             # If mutual information decreases, restore previous best state
             with open(save_folder + "weights_record.pkl", "wb") as f:
                 pickle.dump(weights_record[max_mi_i], f)
