@@ -24,6 +24,7 @@ from .unroll import (
     clean_select,
     plot_final_result,
     plot_selected,
+    select_boundary,
     select_cells,
     select_rest_cells,
     x_axis,
@@ -32,4 +33,4 @@ from .unroll import (
     y_axis_circle,
 )
 
-__version__ = "1.0.3"
+__version__ = "2.0.0"

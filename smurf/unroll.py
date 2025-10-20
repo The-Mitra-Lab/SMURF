@@ -7,7 +7,9 @@ import scanpy as sc
 import tqdm
 from numba import jit
 from scipy.interpolate import interp1d
-from scipy.spatial import cKDTree
+from scipy.spatial import Delaunay, cKDTree
+from shapely.geometry import MultiLineString, Polygon
+from shapely.ops import polygonize, unary_union
 from sklearn.manifold import LocallyLinearEmbedding
 from sklearn.neighbors import NearestNeighbors
 
@@ -245,13 +247,19 @@ def clean_select(
         return [selected[0][keep_mask], selected[1][keep_mask]]
 
 
-def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
+def select_cells(
+    adata,
+    cluster,
+    cluster_name="cell_cluster",
+    spatial_name=["array_row", "array_col"],
+    so=None,
+):
 
     """
     Selects cells from an AnnData object based on cluster labels and retrieves their spatial coordinates.
 
     This function selects cells belonging to specified cluster(s) from the provided AnnData object and extracts
-    their spatial coordinates. The spatial coordinates are retrieved either from `adata.obs['array_row']` and `adata.obs['array_col']`,
+    their spatial coordinates. The spatial coordinates are retrieved either from `adata.obs['array_row']` and `adata.obs['array_col']` (or self-defined names),
     or from a provided spatial object `so` containing `cell_centers`.
 
     :param adata:
@@ -265,6 +273,10 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
     :param cluster_name:
         The name of the column in `adata.obs` that contains the cluster labels. Defaults to `'cell_cluster'`.
     :type cluster_name: str, optional
+
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `adata.obs` that contain the spatial coordinates.
+        Defaults to `['array_row', 'array_col']`.
 
     :param so:
         A spatial object containing spatial data, including `cell_centers`. If 'array_row' and 'array_col' coordinates are not available
@@ -281,8 +293,8 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
 
     index = np.array(adata[adata.obs[cluster_name].isin(cluster)].obs.index)
 
-    if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
-        xys = np.array(adata[index, :].obs[["array_row", "array_col"]])
+    if spatial_name[0] in adata.obs.columns and spatial_name[0] in adata.obs.columns:
+        xys = np.array(adata[index, :].obs[spatial_name])
     elif so is not None:
         xys = []
         for cell_id in index:
@@ -291,7 +303,7 @@ def select_cells(adata, cluster, cluster_name="cell_cluster", so=None):
         xys = np.array(xys)
     else:
         raise ValueError(
-            "Please input either 'so' or ensure 'array_row' and 'array_col' are in 'adata.obs'"
+            "Please input either 'so' or ensure spatial_name are in 'adata.obs'"
         )
 
     return index, xys
@@ -308,7 +320,15 @@ def sort_index(data, order=1):
 
 
 def x_axis(
-    selected, adata, so=None, seed=42, n_neighbors=50, num_avg=35, unit=5, resolution=2
+    selected,
+    adata,
+    so=None,
+    seed=42,
+    n_neighbors=50,
+    num_avg=35,
+    unit=5,
+    resolution=2,
+    spatial_name=["array_row", "array_col"],
 ):
 
     """
@@ -357,6 +377,10 @@ def x_axis(
         Defaults to `2`.
     :type resolution: float, optional
 
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `adata.obs` that contain the spatial coordinates.
+        Defaults to `['array_row', 'array_col']`.
+
     :return:
         A NumPy array `even_points` of shape (num_points, 2), containing the coordinates of evenly spaced points along the x-axis.
     :rtype: numpy.ndarray
@@ -374,16 +398,18 @@ def x_axis(
     order = sort_index(color)
     nums = np.array(order)
 
-    axis = np.zeros([len(order), 3])
+    axis = np.zeros([len(order), 3], dtype=object)
     for i in range(len(order)):
         idd = int(nums[i])
-        axis[idd, 0] = float(selected[0][i])
+        axis[idd, 0] = selected[0][i]
         axis[idd, 1:3] = X[i, :]
 
-    new = np.zeros([len(order) - num_avg + 1, 3])
+    new = np.zeros([len(order) - num_avg + 1, 3], dtype=float)
     for i in range(len(order) - num_avg + 1):
         new[i, 0] = i
-        new[i, 1:3] = axis[i : i + num_avg + 1, 1:3].mean(axis=0)
+        new[i, 1:3] = np.asarray(axis[i : i + num_avg + 1, 1:3], dtype=float).mean(
+            axis=0
+        )
 
     initial_points = new[:, 1:3]
 
@@ -403,8 +429,8 @@ def x_axis(
         (interp_x(even_distances), interp_y(even_distances)), axis=-1
     )
 
-    if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
-        xyss = np.array(adata.obs[["array_row", "array_col"]])
+    if spatial_name[0] in adata.obs.columns and spatial_name[1] in adata.obs.columns:
+        xyss = np.array(adata.obs[spatial_name])
     elif so is not None:
         xyss = []
         #  cell_ids_rest = []
@@ -417,7 +443,7 @@ def x_axis(
     # cell_ids_rest = np.array(cell_ids_rest)
     else:
         raise ValueError(
-            "Please input either 'so' or ensure 'array_row' and 'array_col' are in 'adata.obs'"
+            "Please input either 'so' or ensure spatial_name are in 'adata.obs'"
         )
 
     ratio = (selected[1][:, 0].max() - selected[1][:, 0].min()) / (
@@ -431,8 +457,8 @@ def x_axis(
         X[:, 0], X[:, 1], c=sort_index(color), cmap=plt.cm.Spectral, s=0.5
     )
     axs[0].set_title("Original Swiss Roll")
-    axs[0].set_xlabel("Array_row")
-    axs[0].set_ylabel("Array_col")
+    axs[0].set_xlabel(spatial_name[0])
+    axs[0].set_ylabel(spatial_name[1])
     cbar = plt.colorbar(c, ax=axs[0], orientation="vertical")
     cbar.set_label("Color Scale")
 
@@ -469,8 +495,8 @@ def x_axis(
         markersize=0.5,
     )
     axs[3].set_title("Unwrapping Mouse Brain")
-    axs[3].set_xlabel("Array_row")
-    axs[3].set_ylabel("Array_col")
+    axs[3].set_xlabel(spatial_name[0])
+    axs[3].set_ylabel(spatial_name[1])
     axs[3].legend()
 
     plt.tight_layout()
@@ -530,6 +556,7 @@ def y_axis(
     unit=5,
     resolution=2,
     center=None,
+    spatial_name=["array_row", "array_col"],
 ):
 
     """
@@ -571,12 +598,16 @@ def y_axis(
         (Optional) A NumPy array of shape (2,) representing the coordinates of the center point. Used to determine the direction of layering (inside or outside). Defaults to `None`.
     :type center: numpy.ndarray, optional
 
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `adata.obs` that contain the spatial coordinates.
+        Defaults to `['array_row', 'array_col']`.
+
     :return:
         A pandas DataFrame `final_results` containing the following columns:
 
         - 'cell_id': Cell IDs.
-        - 'array_row': Original x-coordinate of the cell.
-        - 'array_col': Original y-coordinate of the cell.
+        - spatial_name[0]: Original x-coordinate of the cell.
+        - spatial_name[1]: Original y-coordinate of the cell.
         - 'x_flattened': Index of the nearest point on the x-axis.
         - 'y_flattened': Scaled distance from the cell to the nearest point on the x-axis.
 
@@ -596,12 +627,18 @@ def y_axis(
     # Create a DataFrame to store final results
     final_results = pd.DataFrame(
         999999 * np.ones([cells[1].shape[0], 5]),
-        columns=["cell_id", "array_row", "array_col", "x_flattened", "y_flattened"],
+        columns=[
+            "cell_id",
+            spatial_name[0],
+            spatial_name[1],
+            "x_flattened",
+            "y_flattened",
+        ],
     )
     #  final_results['data_total_id'] = list(range(cells_before, data_total.shape[0]))
     final_results["cell_id"] = cells[0]
-    final_results["array_row"] = cells[1][:, 0]
-    final_results["array_col"] = cells[1][:, 1]
+    final_results[spatial_name[0]] = cells[1][:, 0]
+    final_results[spatial_name[1]] = cells[1][:, 1]
     final_results["x_flattened"] = indices.flatten()
     final_results["y_flattened"] = distances.flatten()
     final_results["y_flattened"] = resolution * final_results["y_flattened"] / unit
@@ -622,16 +659,16 @@ def y_axis(
                 999999 * np.zeros([len(selected[0]), 5]),
                 columns=[
                     "cell_id",
-                    "array_row",
-                    "array_col",
+                    spatial_name[0],
+                    spatial_name[1],
                     "x_flattened",
                     "y_flattened",
                 ],
             )
             #     final_results2['data_total_id'] = list(range(len(selected[0])))
             final_results2["cell_id"] = selected[0]
-            final_results2["array_row"] = selected[1][:, 0]
-            final_results2["array_col"] = selected[1][:, 1]
+            final_results2[spatial_name[0]] = selected[1][:, 0]
+            final_results2[spatial_name[1]] = selected[1][:, 1]
             final_results2["x_flattened"] = indices.flatten()
             final_results2["y_flattened"] = 0
 
@@ -643,7 +680,7 @@ def y_axis(
 
     if center is not None:
         final_results["same_direction_by_dot"] = final_results.apply(
-            lambda row: check_cos_angle(row, center, x_axis), axis=1
+            lambda row: check_cos_angle(row, center, x_axis, spatial_name), axis=1
         )
         final_results = final_results[final_results["same_direction_by_dot"]]
         final_results.drop(columns=["same_direction_by_dot"], inplace=True)
@@ -663,8 +700,8 @@ def y_axis(
 
     # --- First Scatter Plot on ax1 ---
     scatter_final_ax1 = ax1.scatter(
-        final_results["array_row"],
-        final_results["array_col"],
+        final_results[spatial_name[0]],
+        final_results[spatial_name[1]],
         c=final_results["x_flattened"],
         cmap="Spectral",
         s=0.5,
@@ -684,8 +721,8 @@ def y_axis(
 
     # Set title and labels for the first subplot
     ax1.set_title("Original Swiss Roll - X Flattened")
-    ax1.set_xlabel("Array_row")
-    ax1.set_ylabel("Array_col")
+    ax1.set_xlabel(spatial_name[0])
+    ax1.set_ylabel(spatial_name[1])
 
     # Add a colorbar for the first scatter plot
     cbar1 = plt.colorbar(scatter_final_ax1, ax=ax1)
@@ -696,8 +733,8 @@ def y_axis(
 
     # --- Second Scatter Plot on ax2 ---
     scatter_final_ax2 = ax2.scatter(
-        final_results["array_row"],
-        final_results["array_col"],
+        final_results[spatial_name[0]],
+        final_results[spatial_name[1]],
         c=final_results["y_flattened"],
         cmap="Spectral",
         s=0.5,
@@ -706,8 +743,8 @@ def y_axis(
 
     # Set title and labels for the second subplot
     ax2.set_title("Original Swiss Roll - Y Flattened")
-    ax2.set_xlabel("Array_row")
-    ax2.set_ylabel("Array_col")
+    ax2.set_xlabel(spatial_name[0])
+    ax2.set_ylabel(spatial_name[1])
 
     # Add a colorbar for the second scatter plot
     cbar2 = plt.colorbar(scatter_final_ax2, ax=ax2)
@@ -726,8 +763,8 @@ def y_axis(
     return final_results
 
 
-def check_cos_angle(row, center, x_axis_results):
-    x, y = row["array_row"], row["array_col"]
+def check_cos_angle(row, center, x_axis_results, spatial_name):
+    x, y = row[spatial_name[0]], row[spatial_name[1]]
     idx = int(row["x_flattened"])
 
     v1 = np.array([x - center[0], y - center[1]])
@@ -739,9 +776,7 @@ def check_cos_angle(row, center, x_axis_results):
 
 
 def x_axis_pre(
-    selected,
-    seed=42,
-    n_neighbors=50,
+    selected, seed=42, n_neighbors=50, spatial_name=["array_row", "array_col"]
 ):
 
     """
@@ -773,6 +808,10 @@ def x_axis_pre(
         Number of neighbors to use in Locally Linear Embedding (LLE). Defaults to `50`.
     :type n_neighbors: int, optional
 
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `adata.obs` that contain
+        the spatial coordinates. Defaults to `['array_row', 'array_col']`.
+
     :return:
         None. The function displays a plot of the data points colored according to their LLE embedding.
     :rtype: None
@@ -800,8 +839,8 @@ def x_axis_pre(
         X[:, 0], X[:, 1], c=sort_index(color), cmap=plt.cm.Spectral, s=0.5
     )
     ax.set_title("Original Swiss Roll")
-    ax.set_xlabel("Array_row")
-    ax.set_ylabel("Array_col")
+    ax.set_xlabel(spatial_name[0])
+    ax.set_ylabel(spatial_name[1])
 
     cbar = plt.colorbar(scatter, ax=ax, orientation="vertical")
     cbar.set_label("Color Scale")
@@ -810,7 +849,13 @@ def x_axis_pre(
     plt.show()
 
 
-def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
+def select_rest_cells(
+    adata,
+    selected=None,
+    delete_xaxis=None,
+    spatial_name=["array_row", "array_col"],
+    so=None,
+):
 
     """
     Selects the remaining cells from an AnnData object after excluding specified cells.
@@ -836,6 +881,10 @@ def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
         - `delete_xaxis[1]`: A NumPy array of positions. Only `delete_xaxis[0]` is used in this function. Defaults to `None`.
 
     :type delete_xaxis: list or tuple of arrays, optional
+
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `adata.obs` that contain the spatial coordinates.
+        Defaults to `['array_row', 'array_col']`.
 
     :param so:
         (Optional) A spatial object containing spatial data, including `cell_centers`. Used to obtain positions if 'array_row' and 'array_col' are not in `adata.obs`. Defaults to `None`.
@@ -866,9 +915,9 @@ def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
         index = index.difference(exclude_indices)
 
     # Proceed to extract 'array_row' and 'array_col' coordinates
-    if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
+    if spatial_name[0] in adata.obs.columns and spatial_name[1] in adata.obs.columns:
         # Use pandas loc for efficient selection
-        xys = adata.obs.loc[index, ["array_row", "array_col"]].values
+        xys = adata.obs.loc[index, spatial_name].values
     elif so is not None:
         # Convert so.cell_centers to a DataFrame if it's a dictionary
         if isinstance(so.cell_centers, dict):
@@ -886,7 +935,7 @@ def select_rest_cells(adata, selected=None, delete_xaxis=None, so=None):
         xys = so_centers_df.loc[index].values
     else:
         raise ValueError(
-            "Please input either 'so' or ensure 'array_row' and 'array_col' are in 'adata.obs'"
+            "Please input either 'so' or ensure spatial_name are in 'adata.obs'"
         )
 
     # Return indices as a NumPy array
@@ -915,6 +964,7 @@ def y_axis_circle(
     max_iter=1000,
     unit=5,
     resolution=2,
+    spatial_name=["array_row", "array_col"],
 ):
 
     """
@@ -974,12 +1024,16 @@ def y_axis_circle(
         Resolution factor for determining the scaling of y-axis values. Higher values result in finer scaling. Defaults to `2`.
     :type resolution: float, optional
 
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `adata.obs` that contain the spatial coordinates.
+        Defaults to `['array_row', 'array_col']`.
+
     :return:
         A pandas DataFrame `final_result` containing the following columns:
 
         - 'cell_id': Cell IDs.
-        - 'array_row': Original x-coordinate of the cell.
-        - 'array_col': Original y-coordinate of the cell.
+        - spatial_name[0]: Original x-coordinate of the cell.
+        - spatial_name[1]: Original y-coordinate of the cell.
         - 'x_flattened': Index of the nearest point on the x-axis.
         - 'y_flattened': Scaled cumulative distance representing the layer.
         - 'layer': Assigned layer number.
@@ -1003,8 +1057,8 @@ def y_axis_circle(
         columns=[
             "data_total_id",
             "cell_id",
-            "array_row",
-            "array_col",
+            spatial_name[0],
+            spatial_name[1],
             "x_flattened",
             "y_flattened",
             "layer",
@@ -1012,8 +1066,8 @@ def y_axis_circle(
     )
     final_results["data_total_id"] = list(range(cells_before, data_total.shape[0]))
     final_results["cell_id"] = rest_cells
-    final_results["array_row"] = xys_final[:, 0]
-    final_results["array_col"] = xys_final[:, 1]
+    final_results[spatial_name[0]] = xys_final[:, 0]
+    final_results[spatial_name[1]] = xys_final[:, 1]
     final_results = final_results.set_index("data_total_id")
 
     layers = {}
@@ -1143,8 +1197,8 @@ def y_axis_circle(
         columns=[
             "data_total_id",
             "cell_id",
-            "array_row",
-            "array_col",
+            spatial_name[0],
+            spatial_name[1],
             "x_flattened",
             "y_flattened",
             "layer",
@@ -1152,8 +1206,8 @@ def y_axis_circle(
     )
     final_results2["data_total_id"] = list(range(len(selected[0])))
     final_results2["cell_id"] = selected[0]
-    final_results2["array_row"] = ids_final[:, 0]
-    final_results2["array_col"] = ids_final[:, 1]
+    final_results2[spatial_name[0]] = ids_final[:, 0]
+    final_results2[spatial_name[1]] = ids_final[:, 1]
     final_results2["x_flattened"] = ids_final[:, 2]
     final_results2["y_flattened"] = ids_final[:, 3]
     final_results2["layer"] = 0
@@ -1168,7 +1222,7 @@ def y_axis_circle(
     final_result.loc[final_result["y_flattened"].isna(), "x_flattened"] = np.nan
     final_result.loc[final_result["y_flattened"].isna(), "layer"] = np.nan
     final_result["y_flattened"] = resolution * final_result["y_flattened"] / unit
-    final_result.index = final_result.index.astype(float)
+    # final_result.index = final_result.index.astype(float)
     final_result = final_result.sort_values(by="cell_id", ascending=True)
 
     final_result = final_result[final_result["x_flattened"] <= x_axis.shape[0]]
@@ -1177,8 +1231,8 @@ def y_axis_circle(
 
     # First subplot
     scatter1 = axs[0].scatter(
-        final_result["array_row"],
-        final_result["array_col"],
+        final_result[spatial_name[0]],
+        final_result[spatial_name[1]],
         c=final_result["x_flattened"],
         cmap=plt.cm.Spectral,
         s=0.5,
@@ -1196,38 +1250,38 @@ def y_axis_circle(
     )
 
     axs[0].set_title("Original Swiss Roll (X color)")
-    axs[0].set_xlabel("Array_row")
-    axs[0].set_ylabel("Array_col")
+    axs[0].set_xlabel(spatial_name[0])
+    axs[0].set_ylabel(spatial_name[1])
     # Add a color bar to the first subplot
     cbar1 = fig.colorbar(scatter1, ax=axs[0])
     cbar1.set_label("Color scale")
 
     # Second subplot
     scatter2 = axs[1].scatter(
-        final_result["array_row"],
-        final_result["array_col"],
+        final_result[spatial_name[0]],
+        final_result[spatial_name[1]],
         c=final_result["y_flattened"],
         cmap=plt.cm.Spectral,
         s=0.5,
     )
     axs[1].set_title("Original Swiss Roll (Y color)")
-    axs[1].set_xlabel("Array_row")
-    axs[1].set_ylabel("Array_col")
+    axs[1].set_xlabel(spatial_name[0])
+    axs[1].set_ylabel(spatial_name[1])
     # Add a color bar to the second subplot
     cbar2 = fig.colorbar(scatter2, ax=axs[1])
     cbar2.set_label("Color scale")
 
     # Third subplot
     scatter3 = axs[2].scatter(
-        final_result["array_row"],
-        final_result["array_col"],
+        final_result[spatial_name[0]],
+        final_result[spatial_name[1]],
         c=final_result["layer"],
         cmap=plt.cm.Spectral,
         s=0.5,
     )
     axs[2].set_title("Original Swiss Roll (Layer color)")
-    axs[2].set_xlabel("Array_row")
-    axs[2].set_ylabel("Array_col")
+    axs[2].set_xlabel(spatial_name[0])
+    axs[2].set_ylabel(spatial_name[1])
     # Add a color bar to the third subplot
     cbar3 = fig.colorbar(scatter3, ax=axs[2])
     cbar3.set_label("layer")
@@ -1238,7 +1292,7 @@ def y_axis_circle(
     return final_result
 
 
-def plot_final_result(final_result):
+def plot_final_result(final_result, spatial_name=["array_row", "array_col"]):
 
     """
     Plots the final results of the spatial unwrapping process.
@@ -1248,6 +1302,10 @@ def plot_final_result(final_result):
     :param final_result:
         A pandas DataFrame containing the final results of the spatial unwrapping, with columns such as 'cell_id', 'array_row', 'array_col', 'x_flattened', 'y_flattened', and possibly 'layer'.
     :type final_result: pandas.DataFrame
+
+    :param spatial_name:
+        A list of two strings specifying the names of the columns in `final_result` that contain the spatial coordinates.
+        Defaults to `['array_row', 'array_col']`.
 
     :return:
         None. The function displays plots of the unwrapped data.
@@ -1262,45 +1320,45 @@ def plot_final_result(final_result):
 
         # First subplot
         scatter1 = axs[0].scatter(
-            final_result["array_row"],
-            final_result["array_col"],
+            final_result[spatial_name[0]],
+            final_result[spatial_name[1]],
             c=final_result["x_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[0].set_title("Original Swiss Roll (X color)")
-        axs[0].set_xlabel("Array_row")
-        axs[0].set_ylabel("Array_col")
+        axs[0].set_xlabel(spatial_name[0])
+        axs[0].set_ylabel(spatial_name[1])
         # Add a color bar to the first subplot
         cbar1 = fig.colorbar(scatter1, ax=axs[0])
         cbar1.set_label("Color scale")
 
         # Second subplot
         scatter2 = axs[1].scatter(
-            final_result["array_row"],
-            final_result["array_col"],
+            final_result[spatial_name[0]],
+            final_result[spatial_name[1]],
             c=final_result["y_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[1].set_title("Original Swiss Roll (Y color)")
-        axs[1].set_xlabel("Array_row")
-        axs[1].set_ylabel("Array_col")
+        axs[1].set_xlabel(spatial_name[0])
+        axs[1].set_ylabel(spatial_name[1])
         # Add a color bar to the second subplot
         cbar2 = fig.colorbar(scatter2, ax=axs[1])
         cbar2.set_label("Color scale")
 
         # Third subplot
         scatter3 = axs[2].scatter(
-            final_result["array_row"],
-            final_result["array_col"],
+            final_result[spatial_name[0]],
+            final_result[spatial_name[1]],
             c=final_result["layer"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[2].set_title("Original Swiss Roll (Layer color)")
-        axs[2].set_xlabel("Array_row")
-        axs[2].set_ylabel("Array_col")
+        axs[2].set_xlabel(spatial_name[0])
+        axs[2].set_ylabel(spatial_name[1])
         # Add a color bar to the third subplot
         cbar3 = fig.colorbar(scatter3, ax=axs[2])
         cbar3.set_label("layer")
@@ -1315,32 +1373,198 @@ def plot_final_result(final_result):
 
         # First subplot
         scatter1 = axs[0].scatter(
-            final_result["array_row"],
-            final_result["array_col"],
+            final_result[spatial_name[0]],
+            final_result[spatial_name[1]],
             c=final_result["x_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[0].set_title("Original Swiss Roll (X color)")
-        axs[0].set_xlabel("Array_row")
-        axs[0].set_ylabel("Array_col")
+        axs[0].set_xlabel(spatial_name[0])
+        axs[0].set_ylabel(spatial_name[1])
         # Add a color bar to the first subplot
         cbar1 = fig.colorbar(scatter1, ax=axs[0])
         cbar1.set_label("Color scale")
 
         # Second subplot
         scatter2 = axs[1].scatter(
-            final_result["array_row"],
-            final_result["array_col"],
+            final_result[spatial_name[0]],
+            final_result[spatial_name[1]],
             c=final_result["y_flattened"],
             cmap=plt.cm.Spectral,
             s=0.5,
         )
         axs[1].set_title("Original Swiss Roll (Y color)")
-        axs[1].set_xlabel("Array_row")
-        axs[1].set_ylabel("Array_col")
+        axs[1].set_xlabel(spatial_name[0])
+        axs[1].set_ylabel(spatial_name[1])
         # Add a color bar to the second subplot
         cbar2 = fig.colorbar(scatter2, ax=axs[1])
         cbar2.set_label("Color scale")
 
         plt.show()
+
+
+def select_boundary(
+    selected,
+    alpha: float | None = None,
+    auto_alpha_quantile: int = 80,
+    dedup_tol: float = 1e-7,
+    spatial_name=("x", "y"),
+    ratio: float | None = None,
+    show_plot: bool = True,
+    title: str = "Boundary",
+):
+    """
+    Compute a concave-hull (alpha-shape) boundary for a point cloud and
+    return the input list structure filtered to boundary points: [names[idx], coords[idx]].
+    Also renders a single panel figure (only the final boundary plot).
+
+    Parameters
+    ----------
+    selected : list-like
+        [names, coords] where:
+          - names: (n,) identifiers
+          - coords: (n, 2) x,y coordinates
+    alpha : float or None
+        Fixed alpha; if None, estimate from Delaunay circumradii at a given quantile.
+    auto_alpha_quantile : int
+        Percentile for alpha estimation (alpha = 1 / percentile(radius)).
+    dedup_tol : float
+        Tolerance to snap polygon vertices to original points.
+    ratio : float | None
+        Width/height ratio for figure; if None, auto-computed from data extents.
+    show_plot : bool
+        Whether to draw the single boundary figure.
+    title : str
+        Figure title (default: "Boundary").
+
+    Returns
+    -------
+    filtered : list
+        [names_on_boundary, coords_on_boundary].
+    """
+
+    # ---- parse inputs ----
+    names, coords = selected
+    coords = np.asarray(coords, dtype=float)
+    names = np.asarray(names)
+    if coords.ndim != 2 or coords.shape[1] != 2:
+        raise ValueError("coords must be shape (n, 2).")
+    if len(coords) != len(names):
+        raise ValueError("names and coords must have the same length.")
+
+    # ---- alpha-shape helpers ----
+    def _alpha_shape_polygon(points: np.ndarray, alpha_val: float) -> Polygon:
+        if len(points) < 4:
+            return Polygon(points).convex_hull
+        tri = Delaunay(points)
+        edges = set()
+        for ia, ib, ic in tri.simplices:
+            pa, pb, pc = points[ia], points[ib], points[ic]
+            a = np.linalg.norm(pb - pc)
+            b = np.linalg.norm(pa - pc)
+            c = np.linalg.norm(pa - pb)
+            s = (a + b + c) / 2.0
+            area2 = s * (s - a) * (s - b) * (s - c)
+            if area2 <= 1e-16:
+                continue
+            area = np.sqrt(area2)
+            R = (a * b * c) / (4.0 * area)
+            if R > 0 and (1.0 / R) >= alpha_val:
+                edges.update(
+                    {
+                        tuple(sorted((ia, ib))),
+                        tuple(sorted((ib, ic))),
+                        tuple(sorted((ic, ia))),
+                    }
+                )
+        if not edges:
+            return Polygon(points).convex_hull
+        m = MultiLineString([(points[i], points[j]) for i, j in edges])
+        polys = list(polygonize(m))
+        if not polys:
+            return Polygon(points).convex_hull
+        geom = unary_union(polys)
+        return (
+            geom
+            if geom.geom_type == "Polygon"
+            else max(geom.geoms, key=lambda g: g.area)
+        )
+
+    def _estimate_alpha(points: np.ndarray, q: int = 80) -> float:
+        tri = Delaunay(points)
+        radii = []
+        for ia, ib, ic in tri.simplices:
+            pa, pb, pc = points[ia], points[ib], points[ic]
+            a = np.linalg.norm(pb - pc)
+            b = np.linalg.norm(pa - pc)
+            c = np.linalg.norm(pa - pb)
+            s = (a + b + c) / 2.0
+            area2 = s * (s - a) * (s - b) * (s - c)
+            if area2 <= 1e-16:
+                continue
+            area = np.sqrt(area2)
+            R = (a * b * c) / (4.0 * area)
+            if np.isfinite(R) and R > 0:
+                radii.append(R)
+        return 1.0 / np.percentile(radii, q) if radii else 1.0
+
+    # ---- compute boundary ----
+    a = _estimate_alpha(coords, auto_alpha_quantile) if alpha is None else alpha
+    poly = _alpha_shape_polygon(coords, alpha_val=a)
+
+    bx, by = poly.exterior.xy
+    boundary_coords = np.column_stack([bx, by])
+    if len(boundary_coords) >= 2 and np.allclose(
+        boundary_coords[0], boundary_coords[-1]
+    ):
+        boundary_coords = boundary_coords[:-1]
+
+    tree = cKDTree(coords)
+    dists, idx = tree.query(boundary_coords, k=1)
+    ok = dists <= dedup_tol
+    idx = idx[ok]
+    boundary_coords = boundary_coords[ok]
+
+    # unique, ordered
+    seen, idx_u, xy_u = set(), [], []
+    for i, xy in zip(idx, boundary_coords):
+        if int(i) not in seen:
+            seen.add(int(i))
+            idx_u.append(int(i))
+            xy_u.append(xy)
+    idx_u = np.asarray(idx_u, dtype=int)
+    xy_u = np.asarray(xy_u, dtype=float)
+
+    filtered = [names[idx_u], coords[idx_u]]
+
+    # ---- single-panel plot ("Boundary") ----
+    if show_plot:
+        X = coords
+        boundary_pts = coords[idx_u]
+
+        if ratio is None:
+            xr = X[:, 0].ptp() if np.isfinite(X[:, 0]).all() else 1.0
+            yr = X[:, 1].ptp() if np.isfinite(X[:, 1]).all() else 1.0
+            ratio = (xr / yr) if yr > 0 else 1.0
+
+        fig, ax = plt.subplots(1, 1, figsize=(5 * ratio, 5), dpi=150)
+        # gray: all points; blue: selected boundary
+        ax.plot(X[:, 0], X[:, 1], ".", c="#e0e0e0", markersize=0.5, label="All")
+        ax.plot(
+            boundary_pts[:, 0],
+            boundary_pts[:, 1],
+            ".",
+            c="blue",
+            markersize=1.2,
+            label="Boundary",
+        )
+        ax.set_title(title)
+        ax.set_xlabel("Array_row")
+        ax.set_ylabel("Array_col")
+        ax.axis("equal")
+        ax.legend(markerscale=4)
+        plt.tight_layout()
+        plt.show()
+
+    return filtered
