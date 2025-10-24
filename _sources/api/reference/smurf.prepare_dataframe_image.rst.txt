@@ -1,0 +1,6 @@
+﻿smurf.prepare\_dataframe\_image
+===============================
+
+.. currentmodule:: smurf
+
+.. autofunction:: prepare_dataframe_image

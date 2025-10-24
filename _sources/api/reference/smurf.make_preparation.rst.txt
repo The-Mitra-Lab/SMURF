@@ -1,0 +1,6 @@
+﻿smurf.make\_preparation
+=======================
+
+.. currentmodule:: smurf
+
+.. autofunction:: make_preparation

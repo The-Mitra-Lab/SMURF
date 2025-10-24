@@ -1,0 +1,6 @@
+﻿smurf.spatial\_object.spatial\_object.image\_temp
+=================================================
+
+.. currentmodule:: smurf.spatial_object
+
+.. automethod:: spatial_object.image_temp

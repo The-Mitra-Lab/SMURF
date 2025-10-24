@@ -1,0 +1,6 @@
+﻿smurf.singlecellanalysis
+========================
+
+.. currentmodule:: smurf
+
+.. autofunction:: singlecellanalysis

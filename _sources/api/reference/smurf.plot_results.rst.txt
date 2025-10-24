@@ -1,0 +1,6 @@
+﻿smurf.plot\_results
+===================
+
+.. currentmodule:: smurf
+
+.. autofunction:: plot_results
