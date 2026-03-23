@@ -185,7 +185,10 @@ def clean_select(
     avg_distances = distances[:, 1:].mean(axis=1)
 
     # Identify outliers among original points based on the cutoff
-    filtered = avg_distances > outlier_cutoff
+    if outlier_cutoff is None:
+        filtered = np.zeros(len(avg_distances), dtype=bool)
+    else:
+        filtered = avg_distances > outlier_cutoff
 
     # Plotting
     ratio = (selected[1][:, 0].max() - selected[1][:, 0].min()) / (
@@ -1185,38 +1188,43 @@ def y_axis_circle(
     pbar.close()
     ids_final = []
 
-    for i in range(len(selected[0])):
-        point = selected[1][i]
-        index, dis = find_closest_point(x_axis, point)
-        ids_final.append([point[0], point[1], index, dis])
+    if len(selected[0]) != 0:
+        for i in range(len(selected[0])):
+            point = selected[1][i]
+            index, dis = find_closest_point(x_axis, point)
+            ids_final.append([point[0], point[1], index, dis])
 
-    ids_final = np.array(ids_final)
+        ids_final = np.array(ids_final)
 
-    final_results2 = pd.DataFrame(
-        np.zeros([len(selected[0]), 7]),
-        columns=[
-            "data_total_id",
-            "cell_id",
-            spatial_name[0],
-            spatial_name[1],
-            "x_flattened",
-            "y_flattened",
-            "layer",
-        ],
-    )
-    final_results2["data_total_id"] = list(range(len(selected[0])))
-    final_results2["cell_id"] = selected[0]
-    final_results2[spatial_name[0]] = ids_final[:, 0]
-    final_results2[spatial_name[1]] = ids_final[:, 1]
-    final_results2["x_flattened"] = ids_final[:, 2]
-    final_results2["y_flattened"] = ids_final[:, 3]
-    final_results2["layer"] = 0
-    final_results2 = final_results2.set_index("data_total_id")
+        final_results2 = pd.DataFrame(
+            np.zeros([len(selected[0]), 7]),
+            columns=[
+                "data_total_id",
+                "cell_id",
+                spatial_name[0],
+                spatial_name[1],
+                "x_flattened",
+                "y_flattened",
+                "layer",
+            ],
+        )
+        final_results2["data_total_id"] = list(range(len(selected[0])))
+        final_results2["cell_id"] = selected[0]
+        final_results2[spatial_name[0]] = ids_final[:, 0]
+        final_results2[spatial_name[1]] = ids_final[:, 1]
+        final_results2["x_flattened"] = ids_final[:, 2]
+        final_results2["y_flattened"] = ids_final[:, 3]
+        final_results2["layer"] = 0
+        final_results2 = final_results2.set_index("data_total_id")
 
-    final_results = final_results.set_index("cell_id")
-    final_results2 = final_results2.set_index("cell_id")
+        final_results = final_results.set_index("cell_id")
+        final_results2 = final_results2.set_index("cell_id")
 
-    final_result = pd.concat([final_results2, final_results])
+        final_result = pd.concat([final_results2, final_results])
+
+    else:
+
+        final_result = final_results
 
     final_result.loc[final_result["y_flattened"] == 999999, "y_flattened"] = np.nan
     final_result.loc[final_result["y_flattened"].isna(), "x_flattened"] = np.nan

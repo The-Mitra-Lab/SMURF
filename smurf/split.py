@@ -120,8 +120,9 @@ def make_preparation(
     """
     epsilon = 1e-8
 
-    weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
-        axis=1
+    # weight_to_celltype_norm = weight_to_celltype/weight_to_celltype.sum(axis = 1).reshape(-1,1)
+    weight_to_celltype_norm = weight_to_celltype / norm(
+        weight_to_celltype, axis=1
     ).reshape(-1, 1)
 
     x2 = np.array([0.5, 0.5])  # Initial guess for two variables
@@ -187,7 +188,7 @@ def make_preparation(
                 # Two different cell types
                 A = weight_to_celltype_norm[cell_types_all_list[0]]
                 B = weight_to_celltype_norm[cell_types_all_list[1]]
-                C = data_temp[spot_id] / data_temp[spot_id].sum()
+                # C = data_temp[spot_id] / data_temp[spot_id].sum()
                 if data_temp[spot_id].sum() > 0:
                     C = data_temp[spot_id] / data_temp[spot_id].sum()
                 else:
@@ -704,7 +705,8 @@ def get_finaldata(
             for i in cells_before_ml[cell_id]:
                 if i[1] > 0.9999999:
                     cells_before_ml_x[cell_id] = (
-                        cells_before_ml_x[cell_id] + data_temp[i[0]]
+                        cells_before_ml_x[cell_id]
+                        + np.array(data_temp[i[0]].todense()).ravel()
                     )
                     binnumbers[cell_id] = binnumbers[cell_id] + 1
                 else:
@@ -800,35 +802,56 @@ def get_finaldata(
 
     cellid_to_index = {}
 
-    final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
     cell_index = list(adatas_final.obs.index)
+    n_cells = len(adatas_final.obs)
+    n_genes = data_temp.shape[1]
+    rows = []
+    cols = []
+    vals = []
 
     # Combine data from cells_before_ml_x
     for i in range(len(cell_index)):
         cell_id = float(cell_index[i])
         cellid_to_index[cell_id] = i
-        final_X[i] = csr_matrix(cells_before_ml_x[cell_id])
+        vec = np.array(cells_before_ml_x[cell_id]).ravel()
+        nz = np.nonzero(vec)[0]
+        if len(nz) > 0:
+            rows.extend([i] * len(nz))
+            cols.extend(nz.tolist())
+            vals.extend(vec[nz].tolist())
 
-    # Assign counts from optimization results to cells
+    # Assign counts from optimization results to cells (multinomial, count-conserving)
     for i in groups_combined.keys():
         for j in range(len(pct_toml_dic[i])):
-            for k in range(len(nonzero_indices_dic[i][j])):
-                cell_id = nonzero_indices_dic[i][j][k]
+            cell_ids_spot = nonzero_indices_dic[i][j]
+            probs = np.array(spot_cell_dic[i][j], dtype=float)
+            prob_sum = probs.sum()
+            if prob_sum <= 0:
+                continue
+            probs = probs / prob_sum
 
-                num_temp = np.zeros([data_temp.shape[1]])
-                spot_data = spots_X_dic[i][j]
-                indices = np.where(spot_data > 0)[0]
-                num_temp[indices] = np.random.binomial(
-                    spot_data[indices].astype(int),
-                    spot_cell_dic[i][j][k],
-                    size=len(indices),
-                )
-                col_indices = np.nonzero(num_temp)[0]
-                values = num_temp[col_indices]
-                final_X[cellid_to_index[cell_id], col_indices] = values
+            spot_data = np.array(spots_X_dic[i][j]).ravel().astype(int)
+            genes = np.where(spot_data > 0)[0]
+            # Update bin numbers once per cell for this spot
+            for idx, cell_id in enumerate(cell_ids_spot):
                 binnumbers[cell_id] = (
-                    binnumbers[cell_id] + spot_cell_dic[i][j][k] * pct_toml_dic[i][j][1]
+                    binnumbers[cell_id] + probs[idx] * pct_toml_dic[i][j][1]
                 )
+
+            for g in genes:
+                counts = np.random.multinomial(spot_data[g], probs)
+                if counts.sum() == 0:
+                    continue
+                for idx, cell_id in enumerate(cell_ids_spot):
+                    c = counts[idx]
+                    if c > 0:
+                        rows.append(cellid_to_index[cell_id])
+                        cols.append(g)
+                        vals.append(c)
+
+    final_X = csr_matrix((vals, (rows, cols)), shape=(n_cells, n_genes))
+    final_X.sum_duplicates()
+    final_X = final_X.astype(np.int32, copy=False)
 
     # Prepare cell information
     if so == None:
@@ -981,8 +1004,8 @@ def get_finaldata_fast(
 
     """
 
-    weight_to_celltype_norm = weight_to_celltype / weight_to_celltype.sum(
-        axis=1
+    weight_to_celltype_norm = weight_to_celltype / norm(
+        weight_to_celltype, axis=1
     ).reshape(-1, 1)
 
     spots_composition = {}
@@ -1199,7 +1222,8 @@ def get_finaldata_fast(
 
     cells_x = {}
     for cell_id in cells_before_ml.keys():
-        cells_x[cell_id] = np.zeros([data_temp.shape[1]])
+        # Keep all cell vectors as dense 1D arrays for consistent and fast updates
+        cells_x[cell_id] = np.zeros([data_temp.shape[1]], dtype=float)
 
     epsilon = 1e-8
     for cell_id in cells_before_ml.keys():
@@ -1207,7 +1231,9 @@ def get_finaldata_fast(
 
             if i[1] > 0.9999999:
                 binnumbers[cell_id] = binnumbers[cell_id] + 1
-                cells_x[cell_id] = cells_x[cell_id] + data_temp[i[0]]
+                cells_x[cell_id] = (
+                    cells_x[cell_id] + np.array(data_temp[i[0]].todense()).ravel()
+                )
             else:
                 # print(i)
                 A = i[1] * weight_to_celltype_norm[i[3]]
@@ -1225,7 +1251,7 @@ def get_finaldata_fast(
                     posinf=0.0,
                     neginf=0.0,
                 )
-                cells_x[cell_id] = cells_x[cell_id] + X
+                cells_x[cell_id] = cells_x[cell_id] + X.ravel()
                 binnumbers[cell_id] = binnumbers[cell_id] + i[1]
 
     ratios = []
@@ -1270,17 +1296,29 @@ def get_finaldata_fast(
         #  spot_data = np.array(spot_data.todense())[0]
         #  print(spot_data.shape)
 
-        for j in range(len(to_ml[i][1])):
+        cell_ids_spot = to_ml[i][1]
+        probs = np.array(ratios[i], dtype=float)
+        prob_sum = probs.sum()
+        if prob_sum <= 0:
+            continue
+        probs = probs / prob_sum
 
-            cell_id = to_ml[i][1][j]
-            num_temp = np.zeros([data_temp.shape[1]])
-            indices = np.where(spot_data > 0)[0]
-            num_temp[indices] = np.random.binomial(
-                spot_data[indices].astype(int), ratios[i][j], size=len(indices)
-            )
-            cells_x[cell_id] = cells_x[cell_id] + csr_matrix(num_temp)
-            binnumbers[cell_id] = binnumbers[cell_id] + ratios[i][j] * to_ml[i][2]
-            spots_composition[to_ml[i][0]][cell_id] = ratios[i][j] * to_ml[i][2]
+        # Update bin numbers once per cell for this spot
+        for j in range(len(cell_ids_spot)):
+            cell_id = cell_ids_spot[j]
+            binnumbers[cell_id] = binnumbers[cell_id] + probs[j] * to_ml[i][2]
+            spots_composition[to_ml[i][0]][cell_id] = probs[j] * to_ml[i][2]
+
+        spot_vec = np.array(spot_data).ravel().astype(int)
+        genes = np.where(spot_vec > 0)[0]
+        for g in genes:
+            counts = np.random.multinomial(spot_vec[g], probs)
+            if counts.sum() == 0:
+                continue
+            for j, cell_id in enumerate(cell_ids_spot):
+                c = counts[j]
+                if c > 0:
+                    cells_x[cell_id][g] += c
 
     final_X = lil_matrix(np.zeros([len(adatas_final.obs), data_temp.shape[1]]))
 
@@ -1310,8 +1348,9 @@ def get_finaldata_fast(
         else:
             cell_info[i, 1] = 0
 
+    final_X = final_X.tocsr().astype(np.int32, copy=False)
     adata_sc_final = anndata.AnnData(
-        X=final_X.tocsr(),
+        X=final_X,
         obs=pd.DataFrame(
             cell_info,
             columns=[

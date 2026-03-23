@@ -25,4 +25,4 @@ sphinx_design
 sphinxext.opengraph
 sphinx-hoverxref
 furo
-nbconvert==7.2.7
+nbconvert==7.17.0

@@ -151,7 +151,7 @@ def start_optimization(
         ):
 
             # Training function for the custom layer
-            optimizer = optim.Adam(self.parameters(), lr=0.1)
+            optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
             losses = []
             prev_loss = None
@@ -177,7 +177,7 @@ def start_optimization(
                     print(f"Epoch {epoch+1}, Loss: {loss.item()}")
 
                 # Early stopping if loss improvement is minimal
-                if prev_loss is not None and (prev_loss - loss_value) <= epsilon:
+                if prev_loss is not None and 0 <= (prev_loss - loss_value) <= epsilon:
                     print(
                         f"Stopping early at epoch {epoch} due to minimal loss improvement."
                     )

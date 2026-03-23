@@ -7,7 +7,7 @@ SMURF relies on external packages for nuclei segmentation to create a so (a spat
 ```{toctree}
 :maxdepth: 1
 
-notebooks/Tutorial_Mousebrian
+notebooks/Tutorial_Mousebrain
 ```
 
 ## Full version (GPU needed)
@@ -15,7 +15,7 @@ notebooks/Tutorial_Mousebrian
 ```{toctree}
 :maxdepth: 1
 
-notebooks/Tutorial_Mousebrian_full
+notebooks/Tutorial_Mousebrain_full
 ```
 
 ## Unrolling Example

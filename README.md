@@ -1,79 +1,95 @@
-# Segmentation and Manifold UnRolling Framework (SMURF)
+# Segmentation and Manifold Unrolling Framework (SMURF)
 
 Welcome to the SMURF repository!
 
-We introduce SMURF (Segmentation and Manifold UnRolling Framework) to perform soft segmentation of [VisiumHD data](https://www.10xgenomics.com/products/visium-hd-spatial-gene-expression), facilitating the creation of a cells*genes anndata object. SMURF uses high-resolution images from VisiumHD for nuclei segmentation and then assigns the transcripts recovered from each capture ‘spot’ to a nearby cell. See [Tutorial](https://the-mitra-lab.github.io/SMURF/) and [preprint paper](https://www.biorxiv.org/content/10.1101/2025.05.28.656357v2) for further details.
-
+SMURF (Segmentation and Manifold Unrolling Framework) is a framework for high-resolution spatial transcriptomics that supports both soft segmentation / transcript assignment and tissue unrolling / flattening. In Visium HD examples, SMURF uses high-resolution histology images for nuclei segmentation and assigns transcripts from each capture spot to nearby cells, enabling reconstruction of a cell-by-gene AnnData object. SMURF can also map complex tissue architectures into Cartesian coordinates for downstream spatial analysis. See the [tutorial](https://the-mitra-lab.github.io/SMURF/) and [preprint](https://www.biorxiv.org/content/10.1101/2025.05.28.656357v3) for further details.
 
 ## Contents
 
-- [Segmentation and Manifold UnRolling Framework (SMURF)](#segmentation-and-manifold-unrolling-framework-smurf)
+- [Segmentation and Manifold Unrolling Framework (SMURF)](#segmentation-and-manifold-unrolling-framework-smurf)
   - [Contents](#contents)
-- [Installation ](#installation-)
-  - [Create conda ](#create-conda-)
-  - [Lite version ](#lite-version-)
-  - [Full version (GPU needed)](#full-version-gpu-needed)
-  - [Developer version](#developer-version)
-- [Citation  ](#citation--)
+  - [Installation](#installation)
+    - [Create a Conda environment](#create-a-conda-environment)
+  - [Choose between SMURF-lite and SMURF-full](#choose-between-smurf-lite-and-smurf-full)
+    - [SMURF-lite](#smurf-lite)
+    - [SMURF-full](#smurf-full)
+    - [Developer install](#developer-install)
+  - [Computational resources](#computational-resources)
+  - [Tutorials](#tutorials)
+  - [Citation](#citation)
 
+## Installation
 
-# Installation <a name="installation"></a>
+We recommend creating a fresh Conda environment before installing SMURF.
 
-You can install SMURF directly from its GitHub repository. Here’s how you can do it:
-
-## Create conda <a name="Createconda"></a>
-
-It is recommended you create a Conda environment, especially if you want to use the full version of SMURF (as opposed to the “lite” version).
+### Create a Conda environment
 
 ```bash
 conda create -n smurf python=3.10
 conda activate smurf
 ```
 
-## Lite version <a name="Lite"></a>
+## Choose between SMURF-lite and SMURF-full
 
-To install the lite version of smurf, run the following command:
+SMURF supports two operating modes for transcript assignment in shared spots.
+
+### SMURF-lite
+
+Install with:
 
 ```bash
 pip install pysmurf
 ```
 
-## Full version (GPU needed)<a name="Full"></a>
+SMURF-lite is the non-deep-learning mode. In the shared-spot transcript-assignment step, it uses a spatial-distance-weighted multinomial strategy and can be run on a standard workstation. Use this mode when a GPU is not available.
 
-To install the full version of smurf, run the following command:
+### SMURF-full
+
+Install with:
 
 ```bash
 pip install "pysmurf[full]"
 ```
 
-The only difference between the full version and the lite version is that the full version ensures that the required version of PyTorch (and related packages) are correctly installed.
+SMURF-full uses the same overall workflow as SMURF-lite, but adds a deep-learning refinement for shared spots involving cells of the same type. A GPU is strongly recommended for practical runtimes.
 
-## Developer version
+### Developer install
 
-To install the Developer version, run the following command:
-
-```bash
-pip install git+https://github.com/The-Mitra-Lab/SMURF.git
-```
-
-or
+Lite:
 
 ```bash
-pip install "git+https://github.com/The-Mitra-Lab/SMURF.git#egg=pysmurf[full]"
+pip install "pysmurf @ git+https://github.com/The-Mitra-Lab/SMURF.git"
 ```
 
-# Citation  <a name="Citation"></a>
+Full:
+
+```bash
+pip install "pysmurf[full] @ git+https://github.com/The-Mitra-Lab/SMURF.git"
+```
+
+## Computational resources
+
+Runtime and storage requirements depend on dataset size and analysis settings. On our benchmark workstation (Ubuntu 20.04.6 LTS; Intel Core i9-10920X CPU, 251 GiB RAM, NVIDIA GeForce RTX 3090 GPU), the mouse brain dataset required 1.69 h with SMURF-lite and 2.92 h with SMURF-full. Storage requirements depend on the size of the 2 μm outputs, associated histology images, and whether high-resolution visualizations and intermediate files are retained. In our experience, a typical mouse brain analysis can be run with approximately 25 GB of available storage, whereas larger datasets or analyses that retain intermediate files and high-resolution outputs may require on the order of 100 GB.
+
+## Tutorials
+
+The main tutorials are available on the documentation site:
+
+- [SMURF-lite segmentation tutorial](https://the-mitra-lab.github.io/SMURF/)
+- [SMURF-full segmentation tutorial](https://the-mitra-lab.github.io/SMURF/)
+- [Unrolling tutorial](https://the-mitra-lab.github.io/SMURF/)
+
+These tutorials illustrate the core segmentation and unrolling workflows used in the manuscript.
+
+## Citation
+
+Please cite SMURF as follows:
 
 ```latex
-
 @article{guo2025smurf,
-  title={SMURF Reconstructs Single-Cells from Visium HD Data to Reveal Zonation of Transcriptional Programs in the Intestine},
-  author={Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan and Valentine, Mark and Dougherty, Joseph and Mitra, Robi David and Muegge, Brian D},
+  title={SMURF: soft-segmentation for single-cell reconstruction and topological analysis of spatial transcriptomic data},
+  author={Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan A and Valentine, Mark C and Chen, David Y and McCoy, William H and Dougherty, Joseph D and Mitra, Robi D and Muegge, Brian D},
   journal={bioRxiv},
-  pages={2025--05},
-  year={2025},
-  publisher={Cold Spring Harbor Laboratory}
+  year={2025}
 }
-
-
 ```
