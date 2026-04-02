@@ -1,0 +1,6 @@
+﻿smurf.get\_finaldata
+====================
+
+.. currentmodule:: smurf
+
+.. autofunction:: get_finaldata

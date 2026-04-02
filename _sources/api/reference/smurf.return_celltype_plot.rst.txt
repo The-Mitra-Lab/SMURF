@@ -1,0 +1,6 @@
+﻿smurf.return\_celltype\_plot
+============================
+
+.. currentmodule:: smurf
+
+.. autofunction:: return_celltype_plot
