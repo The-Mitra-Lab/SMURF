@@ -596,7 +596,8 @@ def calculate_weight_to_celltype(adatas_final, adata, cells_final, so):
         (len(adatas_final.obs.leiden.unique()), adata.shape[1])
     )
     for i in range(len(adatas_final.obs.leiden.unique())):
-        weight_to_celltype[i] = final_X[adatas_final.obs.leiden == str(i)].mean(axis=0)
+        mask = (adatas_final.obs.leiden == str(i)).to_numpy(dtype=bool)
+        weight_to_celltype[i] = np.asarray(final_X[mask].mean(axis=0)).ravel()
 
     weight_to_celltype = weight_to_celltype / norm(weight_to_celltype, axis=1).reshape(
         -1, 1
