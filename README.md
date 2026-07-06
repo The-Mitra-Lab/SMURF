@@ -2,7 +2,7 @@
 
 Welcome to the SMURF repository!
 
-SMURF (Segmentation and Manifold Unrolling Framework) is a framework for high-resolution spatial transcriptomics that supports both soft segmentation / transcript assignment and tissue unrolling / flattening. In Visium HD examples, SMURF uses high-resolution histology images for nuclei segmentation and assigns transcripts from each capture spot to nearby cells, enabling reconstruction of a cell-by-gene AnnData object. SMURF can also map complex tissue architectures into Cartesian coordinates for downstream spatial analysis. See the [tutorial](https://the-mitra-lab.github.io/SMURF/) and [preprint](https://www.biorxiv.org/content/10.1101/2025.05.28.656357v3) for further details.
+SMURF (Segmentation and Manifold Unrolling Framework) is a framework for high-resolution spatial transcriptomics that supports both soft segmentation / transcript assignment and tissue unrolling / flattening. In Visium HD examples, SMURF uses high-resolution histology images for nuclei segmentation and assigns transcripts from each capture spot to nearby cells, enabling reconstruction of a cell-by-gene AnnData object. SMURF can also map complex tissue architectures into Cartesian coordinates for downstream spatial analysis. See the [tutorial](https://the-mitra-lab.github.io/SMURF/) and [paper](https://www.nature.com/articles/s41467-026-74464-4) for further details.
 
 ## Contents
 
@@ -86,10 +86,11 @@ These tutorials illustrate the core segmentation and unrolling workflows used in
 Please cite SMURF as follows:
 
 ```latex
-@article{guo2025smurf,
+@article{guo2026smurf,
   title={SMURF: soft-segmentation for single-cell reconstruction and topological analysis of spatial transcriptomic data},
-  author={Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan A and Valentine, Mark C and Chen, David Y and McCoy, William H and Dougherty, Joseph D and Mitra, Robi D and Muegge, Brian D},
-  journal={bioRxiv},
-  year={2025}
+  author={Guo, Juanru and Sarafinovska, Simona and Hagenson, Ryan A and Valentine, Mark C and Chen, David Y and McCoy IV, William H and Dougherty, Joseph D and Mitra, Robi D and Muegge, Brian D},
+  journal={Nature Communications},
+  year={2026},
+  publisher={Nature Publishing Group UK London}
 }
 ```
