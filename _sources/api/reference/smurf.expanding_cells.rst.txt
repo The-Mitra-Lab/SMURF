@@ -1,0 +1,6 @@
+﻿smurf.expanding\_cells
+======================
+
+.. currentmodule:: smurf
+
+.. autofunction:: expanding_cells

@@ -1,0 +1,6 @@
+﻿smurf.itering\_arragement
+=========================
+
+.. currentmodule:: smurf
+
+.. autofunction:: itering_arragement
